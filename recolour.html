@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>recolour your charts</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f0eb;
+    color: #2c2218;
+    min-height: 100vh;
+    padding: 2rem 1.5rem;
+  }
+
+  header { margin-bottom: 2rem; }
+  header h1 { font-size: 1.75rem; font-weight: 700; color: #3d2b1f; }
+  header p  { color: #7a6255; margin-top: 0.3rem; font-size: 0.95rem; }
+
+  #upload-zone {
+    border: 2px dashed #c4a882;
+    border-radius: 14px;
+    padding: 3.5rem 2rem;
+    text-align: center;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    max-width: 560px;
+  }
+  #upload-zone:hover, #upload-zone.drag-over { border-color: #8b6347; background: #fdf6ee; }
+  #upload-zone .icon  { font-size: 3rem; margin-bottom: 0.75rem; line-height: 1; }
+  #upload-zone .label { font-size: 1rem; font-weight: 600; color: #3d2b1f; margin-bottom: 0.3rem; }
+  #upload-zone .hint  { font-size: 0.83rem; color: #9e8070; }
+  #file-input { display: none; }
+
+  .card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+  .card-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #9e8070; margin-bottom: 1rem; }
+
+  #charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; }
+  @media (max-width: 640px) { #charts-row { grid-template-columns: 1fr; } }
+
+  canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    background: #f0ece8;
+  }
+  .canvas-placeholder {
+    border-radius: 6px; background: #f5f0eb;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; color: #bba898; min-height: 120px;
+  }
+
+  .info-strip {
+    font-size: 0.78rem; color: #9e8070;
+    background: #fdf6ee; border: 1px solid #f0e0cc;
+    border-radius: 8px; padding: 0.5rem 0.85rem; margin-bottom: 1.25rem;
+  }
+
+  #color-list { display: flex; flex-direction: column; }
+  .color-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.7rem 0; border-bottom: 1px solid #f5f0eb;
+  }
+  .color-row:last-child { border-bottom: none; }
+
+  .swatch { width: 38px; height: 38px; border-radius: 7px; border: 1px solid rgba(0,0,0,0.08); flex-shrink: 0; }
+  .color-meta { flex: 1; min-width: 0; }
+  .color-hex  { font-size: 0.8rem; font-weight: 600; font-family: monospace; color: #3d2b1f; }
+  .color-pct  { font-size: 0.75rem; color: #9e8070; }
+  .arrow { color: #c4a882; font-size: 1rem; flex-shrink: 0; }
+  .replacement { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; }
+
+  #grid-color-row {
+    border-top: 2px solid #f0e8e0;
+    margin-top: 0.25rem;
+    border-bottom: none;
+  }
+
+  .btn-row { display: flex; gap: 0.65rem; flex-wrap: wrap; margin-top: 1.25rem; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.6rem 1.1rem; border: none; border-radius: 8px;
+    font-size: 0.87rem; font-weight: 600; cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: #79716b; color: white; }
+  .btn-primary:hover:not(:disabled) { background: #7a5540; }
+  .btn-success { background: #3a7d44; color: white; }
+  .btn-success:hover:not(:disabled) { background: #2e6438; }
+  .btn-ghost   { background: #f0e8e0; color: #5a3e2b; }
+  .btn-ghost:hover:not(:disabled) { background: #e8ddd4; }
+
+  #status { font-size: 0.83rem; color: #7a6255; margin-top: 0.6rem; min-height: 1.2em; }
+  .hidden { display: none !important; }
+
+  .zoom-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+  .zoom-row label { font-size: 0.78rem; color: #9e8070; }
+  .zoom-row input[type=range] { width: 90px; accent-color: #8b6347; }
+  .zoom-row span { font-size: 0.78rem; color: #3d2b1f; font-weight: 600; min-width: 28px; }
+
+  .cs-wrap { position: relative; flex-shrink: 0; }
+
+  .cs-trigger {
+    display: flex; align-items: center; gap: 6px;
+    padding: 0.35rem 0.6rem;
+    border: 1.5px solid #ddd0c4; border-radius: 7px;
+    background: white; cursor: pointer;
+    font-size: 0.8rem; color: #2c2218; font-family: inherit;
+    width: 162px; text-align: left;
+    transition: border-color 0.15s;
+  }
+  .cs-trigger:hover, .cs-trigger:focus { outline: none; border-color: #8b6347; }
+
+  .cs-swatch {
+    width: 16px; height: 16px; border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.12); flex-shrink: 0;
+  }
+  .cs-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cs-arrow { color: #bba898; font-size: 0.65rem; flex-shrink: 0; }
+
+  .cs-panel {
+    position: absolute; top: calc(100% + 5px); right: 0;
+    background: white; border: 1.5px solid #ddd0c4; border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.14); z-index: 300;
+    max-height: 260px; overflow-y: auto; min-width: 178px;
+    padding: 4px;
+    /* Custom scrollbar */
+    scrollbar-width: thin; scrollbar-color: #ddd0c4 transparent;
+  }
+  .cs-panel::-webkit-scrollbar { width: 5px; }
+  .cs-panel::-webkit-scrollbar-thumb { background: #ddd0c4; border-radius: 3px; }
+
+  .cs-opt {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 8px; border-radius: 6px; cursor: pointer;
+    font-size: 0.8rem; color: #2c2218;
+    transition: background 0.1s;
+  }
+  .cs-opt:hover { background: #f5f0eb; }
+  .cs-opt.active { background: #fdf6ee; font-weight: 600; }
+
+  .cs-opt-swatch {
+    width: 16px; height: 16px; border-radius: 3px;
+    border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1> recolour yr charts - make all your tuxies tabbies - or something </h1>
+  <p>Upload a colourwork chart, swap the colours, download your new chart.</p>
+</header>
+
+<div id="upload-zone">
+  <div class="label">Drop your chart here, or click to browse</div>
+  <div class="hint">PNGs are best, GIFs are okay, JPGs will end in tears and chaos.</div>
+  <input type="file" id="file-input" accept="image/*">
+</div>
+
+<div id="main" class="hidden">
+
+  <div id="charts-row">
+    <div class="card">
+      <div class="card-title">Original</div>
+      <div class="zoom-row">
+        <label>Zoom:</label>
+        <input type="range" id="zoom-orig" min="1" max="8" step="0.5" value="2">
+        <span id="zoom-orig-val">2×</span>
+      </div>
+      <canvas id="original-canvas"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">Recoloured</div>
+      <div class="zoom-row">
+        <label>Zoom:</label>
+        <input type="range" id="zoom-res" min="1" max="8" step="0.5" value="2">
+        <span id="zoom-res-val">2×</span>
+      </div>
+      <canvas id="result-canvas" class="hidden"></canvas>
+      <div class="canvas-placeholder" id="result-placeholder">Generate to preview</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Colour Mapping</div>
+
+    <div class="info-strip">
+      The MACHINE looks for rectangles with all sides between 12 and 64 pixels.
+      The MACHINE deems that rectangle to be a stitch.
+      The MACHINE can not yet cope properly with row/ column numbering, or chart keys, or whitespace around the chart.
+      The MACHINE reminds you that this is a work in progress.
+
+    </div>
+
+    <div id="color-list"></div>
+
+    <div class="color-row" id="grid-color-row" style="display:none">
+      <div class="swatch" id="grid-swatch" title="Grid colour"></div>
+      <div class="color-meta">
+        <div class="color-hex">Grid &amp; separators</div>
+        <div class="color-pct">Lines and anti-aliased edges</div>
+      </div>
+      <span class="arrow">→</span>
+      <div class="replacement" id="grid-select-wrap"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="generate-btn">generate my chart</button>
+      <button class="btn btn-success" id="download-btn" disabled>download the new chart<a/button>
+      <button class="btn btn-ghost"   id="new-image-btn">start again</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+</div>
+
+<script>
+const PALETTE = [
+  { name: 'White',        hex: '#FFFFFF' },
+  { name: 'Cream',        hex: '#FFFDD0' },
+  { name: 'Ivory',        hex: '#F5F0E1' },
+  { name: 'Light Gray',   hex: '#CACACA' },
+  { name: 'Gray',         hex: '#888888' },
+  { name: 'Charcoal',     hex: '#454545' },
+  { name: 'Black',        hex: '#1A1A1A' },
+  { name: 'Sand',         hex: '#D4B896' },
+  { name: 'Caramel',      hex: '#C17F3A' },
+  { name: 'Brown',        hex: '#7B3F00' },
+  { name: 'Chestnut',     hex: '#954535' },
+  { name: 'Navy',         hex: '#002366' },
+  { name: 'Cobalt',       hex: '#0047AB' },
+  { name: 'Sky Blue',     hex: '#87CEEB' },
+  { name: 'Teal',         hex: '#00827F' },
+  { name: 'Turquoise',    hex: '#30D5C8' },
+  { name: 'Forest Green', hex: '#228B22' },
+  { name: 'Sage',         hex: '#7D9B76' },
+  { name: 'Mint',         hex: '#98D8C8' },
+  { name: 'Crimson',      hex: '#CC2200' },
+  { name: 'Burgundy',     hex: '#800020' },
+  { name: 'Coral',        hex: '#FF6B5B' },
+  { name: 'Gold',         hex: '#FFB700' },
+  { name: 'Mustard',      hex: '#D4A017' },
+  { name: 'Orange',       hex: '#E06820' },
+  { name: 'Blush Pink',   hex: '#FFB6C1' },
+  { name: 'Hot Pink',     hex: '#FF69B4' },
+  { name: 'Purple',       hex: '#6A0DAD' },
+  { name: 'Lavender',     hex: '#9B72CF' },
+  { name: 'Lilac',        hex: '#C8A2C8' },
+];
+
+let srcImageData   = null;
+let clusters       = [];
+let pixelMap       = null;
+let pixelCategory  = null; // Uint8Array: 0=background, 1=grid/antialias, 2=stitch
+let replacements   = [];
+let gridColor      = '#CACACA';
+let lastResultData = null;
+let currentZoomOrig = 2, currentZoomRes = 2;
+
+function hexToRgb(hex) {
+  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+}
+function rgbToHex(r,g,b) {
+  return '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+}
+
+function closeAllPanels() {
+  document.querySelectorAll('.cs-panel').forEach(p => p.classList.add('hidden'));
+}
+document.addEventListener('click', closeAllPanels);
+
+
+function buildCustomSelect(initialHex, allowKeep, onChange) {
+  const wrap = document.createElement('div');
+  wrap.className = 'cs-wrap';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'cs-trigger';
+
+  const swatchEl = document.createElement('span');
+  swatchEl.className = 'cs-swatch';
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'cs-label';
+
+  const arrowEl = document.createElement('span');
+  arrowEl.className = 'cs-arrow';
+  arrowEl.textContent = '▾';
+
+  btn.append(swatchEl, labelEl, arrowEl);
+
+  const panel = document.createElement('div');
+  panel.className = 'cs-panel hidden';
+
+  const options = [];
+  if (allowKeep) options.push({ hex: null, name: '— Keep original —' });
+  options.push(...PALETTE);
+
+  for (const opt of options) {
+    const row = document.createElement('div');
+    row.className = 'cs-opt';
+    row.dataset.hex = opt.hex ?? '';
+
+    const sw = document.createElement('span');
+    sw.className = 'cs-opt-swatch';
+    if (opt.hex) {
+      sw.style.background = opt.hex;
+    } else {
+      sw.style.background = 'transparent';
+      sw.style.border = '1.5px dashed #ccc';
+    }
+
+    const lbl = document.createElement('span');
+    lbl.textContent = opt.name;
+    row.append(sw, lbl);
+    panel.appendChild(row);
+  }
+
+  wrap.append(btn, panel);
+
+  function setDisplay(hex) {
+    if (hex) {
+      swatchEl.style.background = hex;
+      swatchEl.style.border = '1px solid rgba(0,0,0,0.12)';
+      const found = PALETTE.find(p => p.hex.toUpperCase() === hex.toUpperCase());
+      labelEl.textContent = found ? found.name : hex;
+    } else {
+      swatchEl.style.background = 'transparent';
+      swatchEl.style.border = '1.5px dashed #ccc';
+      labelEl.textContent = '— Keep original —';
+    }
+    panel.querySelectorAll('.cs-opt').forEach(r => {
+      r.classList.toggle('active', r.dataset.hex === (hex ?? ''));
+    });
+  }
+
+  setDisplay(initialHex);
+
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const wasOpen = !panel.classList.contains('hidden');
+    closeAllPanels();
+    if (!wasOpen) panel.classList.remove('hidden');
+  });
+
+  panel.addEventListener('click', e => {
+    e.stopPropagation();
+    const opt = e.target.closest('.cs-opt');
+    if (!opt) return;
+    const selected = opt.dataset.hex || null;
+    setDisplay(selected);
+    panel.classList.add('hidden');
+    onChange(selected);
+  });
+
+  return wrap;
+}
+const CLUSTER_TOL = 25;
+const MIN_PX = 12, MAX_PX = 64;
+
+function analyzeColors(imageData) {
+  const { data, width, height } = imageData;
+  const n = width * height;
+
+  const freq = new Map();
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i+3] < 128) continue;
+    const key = (data[i] << 16) | (data[i+1] << 8) | data[i+2];
+    freq.set(key, (freq.get(key) || 0) + 1);
+  }
+
+  const sorted = [...freq.entries()].sort((a,b) => b[1]-a[1]);
+  const centers = [];
+  const exactToCluster = new Map();
+
+  for (const [key] of sorted) {
+    const r=(key>>16)&255, g=(key>>8)&255, b=key&255;
+    let best=-1, bestD=CLUSTER_TOL;
+    for (let i=0; i<centers.length; i++) {
+      const [cr,cg,cb]=centers[i];
+      const d=Math.sqrt((r-cr)**2+(g-cg)**2+(b-cb)**2);
+      if (d<=bestD) { bestD=d; best=i; }
+    }
+    if (best===-1) { best=centers.length; centers.push([r,g,b]); }
+    exactToCluster.set(key, best);
+  }
+  const K = centers.length;
+
+  const pixelCluster = new Int32Array(n).fill(-1);
+  for (let i=0; i<data.length; i+=4) {
+    if (data[i+3]<128) continue;
+    const key=(data[i]<<16)|(data[i+1]<<8)|data[i+2];
+    const c = exactToCluster.get(key);
+    if (c !== undefined) pixelCluster[i>>2] = c;
+  }
+
+
+  const hCat = new Uint8Array(n); // default 0
+  for (let y=0; y<height; y++) {
+    const base = y*width;
+    let runC = pixelCluster[base], runStart = 0;
+    for (let x=1; x<=width; x++) {
+      const c = x<width ? pixelCluster[base+x] : -2;
+      if (c !== runC) {
+        const len = x - runStart;
+        if (runC >= 0) {
+          const cat = len < MIN_PX ? 1 : (len <= MAX_PX ? 2 : 0);
+          for (let i=runStart; i<x; i++) hCat[base+i] = cat;
+        }
+        runStart = x; runC = c;
+      }
+    }
+  }
+
+  const vCat = new Uint8Array(n); // default 0
+  for (let x=0; x<width; x++) {
+    let runC = pixelCluster[x], runStart = 0;
+    for (let y=1; y<=height; y++) {
+      const c = y<height ? pixelCluster[y*width+x] : -2;
+      if (c !== runC) {
+        const len = y - runStart;
+        if (runC >= 0) {
+          const cat = len < MIN_PX ? 1 : (len <= MAX_PX ? 2 : 0);
+          for (let i=runStart; i<y; i++) vCat[i*width+x] = cat;
+        }
+        runStart = y; runC = c;
+      }
+    }
+  }
+
+
+  const clusterValid = new Uint8Array(K);
+  for (let x=0; x<width; x++) {
+    let vC=-1, vCount=0;
+    for (let y=0; y<=height; y++) {
+      const idx = y*width+x;
+      const c   = y<height ? pixelCluster[idx] : -2;
+      const hv  = y<height ? (hCat[idx] === 2)  : false;
+      if (hv && c === vC) {
+        vCount++;
+        if (vCount >= MIN_PX) clusterValid[c] = 1;
+      } else {
+        vC     = (hv && c >= 0) ? c  : -1;
+        vCount = (hv && c >= 0) ? 1  : 0;
+      }
+    }
+  }
+
+
+  const pixelCat = new Uint8Array(n); // default 0 (background)
+  for (let i=0; i<n; i++) {
+    const c = pixelCluster[i];
+    if (c < 0) continue; // transparent → background
+    if (hCat[i] === 2 && clusterValid[c]) {
+      pixelCat[i] = 2; // stitch
+    } else if (hCat[i] === 0 && vCat[i] === 0) {
+      pixelCat[i] = 0; // background (long runs in both axes)
+    } else {
+      pixelCat[i] = 1; // grid line or antialias edge
+    }
+  }
+
+  const oldToNew = new Int32Array(K).fill(-1);
+  const validCenters = [];
+  for (let i=0; i<K; i++) {
+    if (clusterValid[i]) {
+      oldToNew[i] = validCenters.length;
+      validCenters.push({ center: centers[i], count: 0 });
+    }
+  }
+
+  const finalMap = new Map();
+  for (const [key, oldIdx] of exactToCluster) {
+    const newIdx = oldToNew[oldIdx];
+    if (newIdx >= 0) finalMap.set(key, newIdx);
+  }
+  for (let i=0; i<data.length; i+=4) {
+    if (data[i+3]<128) continue;
+    const key=(data[i]<<16)|(data[i+1]<<8)|data[i+2];
+    const newIdx=finalMap.get(key);
+    if (newIdx!==undefined) validCenters[newIdx].count++;
+  }
+
+  const order = validCenters.map((_,i)=>i).sort((a,b)=>validCenters[b].count-validCenters[a].count);
+  const rankOf = new Array(validCenters.length);
+  order.forEach((orig,rank) => { rankOf[orig]=rank; });
+
+  const sortedClusters = order.map(i => validCenters[i]);
+  const remapped = new Map();
+  for (const [key,idx] of finalMap) remapped.set(key, rankOf[idx]);
+
+  return { clusters: sortedClusters, pixelMap: remapped, pixelCategory: pixelCat };
+}
+
+
+function applyReplacements(imageData, pixelCategory, pixelMap, replacements, gridColor) {
+  const src = imageData.data;
+  const out = new Uint8ClampedArray(src);
+  const [gr, gg, gb] = hexToRgb(gridColor);
+
+  for (let i=0; i<src.length; i+=4) {
+    if (src[i+3] < 128) continue;
+    const cat = pixelCategory[i >> 2];
+
+    if (cat === 2) {
+      const key = (src[i]<<16)|(src[i+1]<<8)|src[i+2];
+      const cIdx = pixelMap.get(key);
+      if (cIdx !== undefined && replacements[cIdx] != null) {
+        const [r,g,b] = hexToRgb(replacements[cIdx]);
+        out[i]=r; out[i+1]=g; out[i+2]=b; out[i+3]=255;
+      }
+    } else if (cat === 1) {
+      out[i]=gr; out[i+1]=gg; out[i+2]=gb; out[i+3]=255;
+    }
+  }
+  return new ImageData(out, imageData.width, imageData.height);
+}
+
+function drawScaled(canvasEl, imageData, zoom) {
+  const {width:w, height:h} = imageData;
+  canvasEl.width  = w * zoom;
+  canvasEl.height = h * zoom;
+  const ctx = canvasEl.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const tmp = document.createElement('canvas');
+  tmp.width=w; tmp.height=h;
+  tmp.getContext('2d').putImageData(imageData, 0, 0);
+  ctx.drawImage(tmp, 0, 0, w*zoom, h*zoom);
+}
+
+const uploadZone     = document.getElementById('upload-zone');
+const fileInput      = document.getElementById('file-input');
+const mainEl         = document.getElementById('main');
+const origCanvas     = document.getElementById('original-canvas');
+const resCanvas      = document.getElementById('result-canvas');
+const resPlaceholder = document.getElementById('result-placeholder');
+const colorListEl    = document.getElementById('color-list');
+const generateBtn    = document.getElementById('generate-btn');
+const downloadBtn    = document.getElementById('download-btn');
+const newImageBtn    = document.getElementById('new-image-btn');
+const statusEl       = document.getElementById('status');
+const zoomOrigSlider = document.getElementById('zoom-orig');
+const zoomOrigVal    = document.getElementById('zoom-orig-val');
+const zoomResSlider  = document.getElementById('zoom-res');
+const zoomResVal     = document.getElementById('zoom-res-val');
+const gridColorRow   = document.getElementById('grid-color-row');
+const gridSwatchEl   = document.getElementById('grid-swatch');
+const gridSelectWrap = document.getElementById('grid-select-wrap');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+function loadFile(file) {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    const tmp = document.createElement('canvas');
+    tmp.width = img.width; tmp.height = img.height;
+    tmp.getContext('2d').drawImage(img, 0, 0);
+    srcImageData = tmp.getContext('2d').getImageData(0, 0, img.width, img.height);
+    URL.revokeObjectURL(url);
+    uploadZone.classList.add('hidden');
+    mainEl.classList.remove('hidden');
+    runAnalysis();
+  };
+  img.src = url;
+}
+
+function runAnalysis() {
+  setStatus('Analysing…');
+  colorListEl.innerHTML = '';
+  gridColorRow.style.display = 'none';
+
+  setTimeout(() => {
+    const result  = analyzeColors(srcImageData);
+    clusters      = result.clusters;
+    pixelMap      = result.pixelMap;
+    pixelCategory = result.pixelCategory;
+    replacements  = clusters.map(() => null);
+
+    drawScaled(origCanvas, srcImageData, currentZoomOrig);
+
+    resCanvas.classList.add('hidden');
+    resPlaceholder.classList.remove('hidden');
+    lastResultData = null;
+    downloadBtn.disabled = true;
+
+    renderColorRows();
+    buildGridSelector();
+
+    setStatus(
+      `Found ${clusters.length} stitch colour${clusters.length !== 1 ? 's' : ''}. `
+    );
+  }, 30);
+}
+
+function renderColorRows() {
+  colorListEl.innerHTML = '';
+  const total = clusters.reduce((s,c) => s + c.count, 0);
+
+  clusters.forEach((cl, i) => {
+    const [r,g,b] = cl.center;
+    const hex = rgbToHex(r,g,b);
+    const pct = ((cl.count / total) * 100).toFixed(1);
+
+    const row = document.createElement('div');
+    row.className = 'color-row';
+    row.innerHTML = `
+      <div class="swatch" style="background:${hex}" title="${hex.toUpperCase()}"></div>
+      <div class="color-meta">
+        <div class="color-hex">${hex.toUpperCase()}</div>
+        <div class="color-pct">${pct}%</div>
+      </div>
+      <span class="arrow">→</span>
+      <div class="replacement" id="rep-${i}"></div>
+    `;
+    colorListEl.appendChild(row);
+
+    const sel = buildCustomSelect(null, true, chosen => {
+      replacements[i] = chosen;
+    });
+    document.getElementById(`rep-${i}`).appendChild(sel);
+  });
+}
+
+function buildGridSelector() {
+  gridSelectWrap.innerHTML = '';
+  gridSwatchEl.style.background = gridColor;
+  gridColorRow.style.display = '';
+
+  const sel = buildCustomSelect(gridColor, false, chosen => {
+    if (chosen) {
+      gridColor = chosen;
+      gridSwatchEl.style.background = chosen;
+    }
+  });
+  gridSelectWrap.appendChild(sel);
+}
+
+function generateChart() {
+  lastResultData = applyReplacements(srcImageData, pixelCategory, pixelMap, replacements, gridColor);
+  drawScaled(resCanvas, lastResultData, currentZoomRes);
+  resCanvas.classList.remove('hidden');
+  resPlaceholder.classList.add('hidden');
+  downloadBtn.disabled = false;
+  setStatus('Done! Download your chart below.');
+}
+
+zoomOrigSlider.addEventListener('input', () => {
+  currentZoomOrig = parseFloat(zoomOrigSlider.value);
+  zoomOrigVal.textContent = currentZoomOrig + '×';
+  if (srcImageData) drawScaled(origCanvas, srcImageData, currentZoomOrig);
+});
+zoomResSlider.addEventListener('input', () => {
+  currentZoomRes = parseFloat(zoomResSlider.value);
+  zoomResVal.textContent = currentZoomRes + '×';
+  if (lastResultData) drawScaled(resCanvas, lastResultData, currentZoomRes);
+});
+
+generateBtn.addEventListener('click', generateChart);
+
+downloadBtn.addEventListener('click', () => {
+  if (!lastResultData) return;
+  const tmp = document.createElement('canvas');
+  tmp.width = lastResultData.width; tmp.height = lastResultData.height;
+  tmp.getContext('2d').putImageData(lastResultData, 0, 0);
+  const a = document.createElement('a');
+  a.download = 'recoloured-chart.png';
+  a.href = tmp.toDataURL('image/png');
+  a.click();
+});
+
+newImageBtn.addEventListener('click', () => {
+  mainEl.classList.add('hidden');
+  uploadZone.classList.remove('hidden');
+  fileInput.value = '';
+  srcImageData = null; lastResultData = null;
+  clusters = []; pixelMap = null; pixelCategory = null; replacements = [];
+  gridColorRow.style.display = 'none';
+});
+
+function setStatus(msg) { statusEl.textContent = msg; }
+</script>
+</body>
+</html>

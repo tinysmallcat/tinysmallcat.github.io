@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stitch Run Labeller</title>
+<style>
+  :root{
+    --wool-50:#faf7f2;
+    --wool-100:#f0e9dd;
+    --wool-300:#d8c8ac;
+    --ink:#2b2620;
+    --ink-soft:#5c5648;
+    --thread-teal:#3d6b64;
+    --thread-teal-dark:#2b4d47;
+    --thread-rust:#b5502f;
+    --line:#e2d6bf;
+    --warn-bg:#fbeee3;
+    --warn-border:#e0a877;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--wool-50);
+    color:var(--ink);
+    font-family: "Iowan Old Style","Palatino Linotype",Georgia,serif;
+    line-height:1.5;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:48px 24px 80px;}
+
+  header.hero{
+    border-bottom:1px solid var(--line);
+    padding-bottom:28px;
+    margin-bottom:36px;
+    position:relative;
+  }
+  .eyebrow{
+    font-family: var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--thread-rust);
+    margin:0 0 10px;
+  }
+  h1{
+    font-size:clamp(28px,4.5vw,42px);
+    margin:0 0 12px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  header.hero p{
+    max-width:60ch;
+    color:var(--ink-soft);
+    font-size:16px;
+    margin:0;
+  }
+
+  .stitch-rule{
+    display:flex;
+    gap:3px;
+    margin:20px 0 0;
+  }
+  .stitch-rule span{
+    width:14px;height:10px;border-radius:1px;
+    background:var(--wool-300);
+  }
+  .stitch-rule span.on{background:var(--thread-teal);}
+
+  section{margin-bottom:36px;}
+  .step-label{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--thread-teal-dark);
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    margin:0 0 8px;
+  }
+
+  .mode-toggle{
+    display:inline-flex;
+    border:1px solid var(--line);
+    border-radius:8px;
+    overflow:hidden;
+    margin-bottom:20px;
+  }
+  .mode-toggle button{
+    font-family:inherit;
+    font-size:14px;
+    padding:10px 18px;
+    border:none;
+    background:var(--wool-50);
+    color:var(--ink-soft);
+    cursor:pointer;
+    border-right:1px solid var(--line);
+  }
+  .mode-toggle button:last-child{border-right:none;}
+  .mode-toggle button.active{
+    background:var(--thread-teal);
+    color:#fff;
+  }
+
+  .panel{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:28px;
+  }
+
+  .dropzone{
+    border:2px dashed var(--wool-300);
+    border-radius:10px;
+    padding:36px 20px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color:var(--thread-teal);
+    background:var(--wool-100);
+  }
+  .dropzone input{display:none;}
+  .dropzone .dz-title{font-size:16px;font-weight:600;margin:0 0 4px;}
+  .dropzone .dz-sub{font-size:13px;color:var(--ink-soft);margin:0;}
+  .filename{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--thread-teal-dark);
+    margin-top:10px;
+  }
+
+  .controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px;
+    margin-top:24px;
+    align-items:flex-end;
+  }
+  .field{display:flex;flex-direction:column;gap:6px;}
+  .field label{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+  .field input[type=number], .field select{
+    font-family:inherit;
+    font-size:15px;
+    padding:9px 10px;
+    border:1px solid var(--wool-300);
+    border-radius:6px;
+    background:var(--wool-50);
+    color:var(--ink);
+    width:120px;
+  }
+  .field select{width:auto;min-width:180px;}
+
+  button.primary{
+    font-family:inherit;
+    font-size:15px;
+    font-weight:600;
+    padding:11px 22px;
+    background:var(--thread-rust);
+    color:#fff;
+    border:none;
+    border-radius:7px;
+    cursor:pointer;
+    transition:background .15s;
+  }
+  button.primary:hover{background:#9b4327;}
+  button.primary:disabled{background:var(--wool-300);cursor:not-allowed;}
+
+  .banner{
+    display:none;
+    border:1px solid var(--warn-border);
+    background:var(--warn-bg);
+    border-radius:8px;
+    padding:14px 16px;
+    font-size:13.5px;
+    color:#6b3a1b;
+    margin-top:20px;
+  }
+  .banner.show{display:block;}
+  .banner strong{display:block;margin-bottom:3px;}
+
+  .error{
+    display:none;
+    border:1px solid #d98a8a;
+    background:#fbe9e9;
+    border-radius:8px;
+    padding:14px 16px;
+    font-size:13.5px;
+    color:#7a2222;
+    margin-top:20px;
+    white-space:pre-wrap;
+  }
+  .error.show{display:block;}
+
+  .result{
+    display:none;
+    margin-top:28px;
+  }
+  .result.show{display:block;}
+  .result-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .result-head h3{margin:0;font-size:18px;}
+  .stats{
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--ink-soft);
+  }
+  .preview-frame{
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:
+      linear-gradient(45deg, #f4f0e6 25%, transparent 25%),
+      linear-gradient(-45deg, #f4f0e6 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #f4f0e6 75%),
+      linear-gradient(-45deg, transparent 75%, #f4f0e6 75%);
+    background-size:20px 20px;
+    background-position:0 0, 0 10px, 10px -10px, -10px 0px;
+    padding:16px;
+    max-height:560px;
+    overflow:auto;
+    text-align:center;
+  }
+  .preview-frame svg, .preview-frame img{max-width:100%;height:auto;}
+
+  a.download-link{
+    display:inline-block;
+    margin-top:16px;
+    font-family:var(--mono);
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--thread-teal-dark);
+    text-decoration:none;
+    border:1px solid var(--thread-teal);
+    padding:9px 16px;
+    border-radius:7px;
+  }
+  a.download-link:hover{background:var(--wool-100);}
+
+  footer{
+    margin-top:56px;
+    padding-top:20px;
+    border-top:1px solid var(--line);
+    font-size:12.5px;
+    color:var(--ink-soft);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">Stranded kntting & intarsia colourwork</p>
+    <h1>Stitch Run Labeller</h1>
+    <p>Upload a colourwork chart and every run of consecutive same-colour
+       stitches at or above your threshold gets numbered on its first stitch. No more peering at teeny boxes.</p>
+    <div class="stitch-rule" aria-hidden="true">
+      <span class="on"></span><span class="on"></span><span class="on"></span>
+      <span class="on"></span><span class="on"></span><span></span><span></span>
+      <span class="on"></span><span class="on"></span><span class="on"></span>
+      <span></span><span></span><span class="on"></span><span class="on"></span>
+      <span class="on"></span><span class="on"></span><span class="on"></span>
+      <span class="on"></span><span></span><span></span>
+    </div>
+  </header>
+
+  <section>
+    <p class="step-label">Step 1 — Chart format</p>
+    <div class="mode-toggle">
+      <button id="btn-svg" class="active">SVG chart</button>
+      <button id="btn-raster">PNG / JPG chart</button>
+    </div>
+
+    <div class="panel">
+      <div id="banner-svg" class="banner">
+        <strong>SVG is best</strong>
+        SVG should give pretty reliable results. Charting software - like
+        Stitchmaster or Stitchfiddle - lets you export as SVG.
+      </div>
+      <div id="banner-raster" class="banner">
+        <strong>Very much a WIP</strong>
+        Raster images - your PNGs and JPGs - are far less reliable than SVG
+        here. If you need to use one, PNG is better than JPG for this purpose
+        - but please check the result against the chart you uploaded before 
+        hitting the needles.
+      </div>
+
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept="">
+        <p class="dz-title">Click to upload, or drag a file here</p>
+        <p class="dz-sub" id="dz-sub">.svg files only</p>
+        <p class="filename" id="filename"></p>
+      </div>
+
+      <div class="controls">
+        <div class="field">
+          <label for="min-run">Minimum run labeller</label>
+          <input type="number" id="min-run" value="5" min="2" step="1">
+        </div>
+        <div class="field">
+          <label for="reading">Knitting method</label>
+          <select id="reading">
+            <option value="round" selected>Knit in the round (right to left)</option>
+            <option value="flat">Knit flat (alternating RS/WS rows)</option>
+          </select>
+        </div>
+        <div class="field" id="flat-start-field" style="display:none;">
+          <label for="flat-start">Row 1 is</label>
+          <select id="flat-start">
+            <option value="rs" selected>Right side (right to left)</option>
+            <option value="ws">Wrong side (left to right)</option>
+          </select>
+        </div>
+        <button class="primary" id="process-btn" disabled>Label chart</button>
+      </div>
+
+      <div class="error" id="error-box"></div>
+    </div>
+  </section>
+
+  <section class="result" id="result">
+    <div class="result-head">
+      <h3>Labelled chart</h3>
+      <span class="stats" id="stats"></span>
+    </div>
+    <div class="preview-frame" id="preview"></div>
+    <a class="download-link" id="download-link">Download labeled file</a>
+  </section>
+
+  <footer>
+    This runs entirely in browser - your charts aren't being uploaded to
+    to some machine somewhere.
+  </footer>
+
+</div>
+
+<script>
+    (function(){
+      "use strict";
+    
+      // ---------------------------------------------------------------------
+      // Mode toggle
+      // ---------------------------------------------------------------------
+      let mode = "svg"; // "svg" | "raster"
+      const btnSvg = document.getElementById("btn-svg");
+      const btnRaster = document.getElementById("btn-raster");
+      const bannerSvg = document.getElementById("banner-svg");
+      const bannerRaster = document.getElementById("banner-raster");
+      const fileInput = document.getElementById("file-input");
+      const dzSub = document.getElementById("dz-sub");
+      const filenameEl = document.getElementById("filename");
+      const processBtn = document.getElementById("process-btn");
+      const errorBox = document.getElementById("error-box");
+      const resultSection = document.getElementById("result");
+    
+      function setMode(m){
+        mode = m;
+        btnSvg.classList.toggle("active", m === "svg");
+        btnRaster.classList.toggle("active", m === "raster");
+        bannerSvg.classList.toggle("show", m === "svg");
+        bannerRaster.classList.toggle("show", m === "raster");
+        fileInput.accept = m === "svg" ? ".svg,image/svg+xml" : ".png,.jpg,.jpeg,image/png,image/jpeg";
+        dzSub.textContent = m === "svg"
+          ? ".svg chart"
+          : ".png or .jpg image of a chart";
+        resetFile();
+      }
+    
+      // ---------------------------------------------------------------------
+      // File selection / drag-drop
+      // ---------------------------------------------------------------------
+      let currentFile = null;
+      const dropzone = document.getElementById("dropzone");
+    
+      function resetFile(){
+        currentFile = null;
+        filenameEl.textContent = "";
+        processBtn.disabled = true;
+        hideError();
+        resultSection.classList.remove("show");
+      }
+    
+      function acceptFile(file){
+        if (!file) return;
+        currentFile = file;
+        filenameEl.textContent = file.name;
+        processBtn.disabled = false;
+        hideError();
+        resultSection.classList.remove("show");
+      }
+    
+      dropzone.addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", e => acceptFile(e.target.files[0]));
+      ["dragenter","dragover"].forEach(evt =>
+        dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add("drag"); }));
+      ["dragleave","drop"].forEach(evt =>
+        dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove("drag"); }));
+      dropzone.addEventListener("drop", e => {
+        const f = e.dataTransfer.files[0];
+        acceptFile(f);
+      });
+    
+      function showError(msg){
+        errorBox.textContent = msg;
+        errorBox.classList.add("show");
+      }
+      function hideError(){
+        errorBox.classList.remove("show");
+        errorBox.textContent = "";
+      }
+    
+      const readingSelect = document.getElementById("reading");
+      const flatStartField = document.getElementById("flat-start-field");
+      const flatStartSelect = document.getElementById("flat-start");
+      function syncFlatStartVisibility(){
+        flatStartField.style.display = readingSelect.value === "flat" ? "" : "none";
+      }
+      readingSelect.addEventListener("change", syncFlatStartVisibility);
+      syncFlatStartVisibility();
+    
+      btnSvg.addEventListener("click", () => setMode("svg"));
+      btnRaster.addEventListener("click", () => setMode("raster"));
+      setMode("svg");
+    
+      processBtn.addEventListener("click", () => {
+        if (!currentFile) return;
+        hideError();
+        resultSection.classList.remove("show");
+        const minRun = Math.max(2, parseInt(document.getElementById("min-run").value, 10) || 5);
+        const reading = {
+          mode: readingSelect.value,
+          firstRowSide: flatStartSelect.value // "rs" or "ws" -- only used when mode === "flat"
+        };
+        try {
+          if (mode === "svg") {
+            processSvgFile(currentFile, minRun, reading);
+          } else {
+            processRasterFile(currentFile, minRun, reading);
+          }
+        } catch (err) {
+          console.error(err);
+          showError("Couldn't process this file: " + err.message );
+        }
+      });
+    
+      // =======================================================================
+      // SVG PATH — direct port of label_chart.py
+      // =======================================================================
+    
+      const SVGNS = "http://www.w3.org/2000/svg";
+    
+      function parseSvgDoc(svgText){
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgText, "image/svg+xml");
+        const perr = doc.querySelector("parsererror");
+        if (perr) throw new Error("This file isn't valid SVG/XML.");
+        const root = doc.documentElement;
+    
+        const cellRects = []; // {x,y,w,h,fill}
+        const bbox = [Infinity, Infinity, -Infinity, -Infinity];
+        function updateBbox(x,y){
+          if (x < bbox[0]) bbox[0] = x;
+          if (y < bbox[1]) bbox[1] = y;
+          if (x > bbox[2]) bbox[2] = x;
+          if (y > bbox[3]) bbox[3] = y;
+        }
+    
+        const NUMRE = /-?\d+\.?\d*/g;
+    
+        function walk(el, fill, stroke){
+          const tag = el.tagName ? el.tagName.replace(/^svg:/,"").toLowerCase() : "";
+          if (tag === "defs" || tag === "clippath") return;
+          if (el.getAttribute && el.getAttribute("desc") === "Key") return;
+    
+          const myFill = (el.getAttribute && el.getAttribute("fill")) || fill;
+          const myStroke = (el.getAttribute && el.getAttribute("stroke")) || stroke;
+          const visible = !(myFill === "none" && (myStroke === null || myStroke === "none"));
+    
+          if (tag === "rect"){
+            const xs = el.getAttribute("x"), ys = el.getAttribute("y");
+            const ws = el.getAttribute("width"), hs = el.getAttribute("height");
+            if (xs !== null && ys !== null && ws && hs){
+              const x = parseFloat(xs), y = parseFloat(ys), w = parseFloat(ws), h = parseFloat(hs);
+              cellRects.push({x,y,w,h,fill: myFill});
+              if (visible){
+                updateBbox(x,y);
+                updateBbox(x+w, y+h);
+              }
+            }
+          } else if (tag === "path"){
+            if (visible){
+              const d = el.getAttribute("d") || "";
+              const nums = d.match(NUMRE) || [];
+              for (let i=0; i < nums.length - 1; i += 2){
+                const nx = parseFloat(nums[i]), ny = parseFloat(nums[i+1]);
+                if (!isNaN(nx) && !isNaN(ny)) updateBbox(nx, ny);
+              }
+            }
+          } else if (tag === "use"){
+            const t = el.getAttribute("transform") || "";
+            const m = t.match(/translate\(([-\d.]+),([-\d.]+)\)/);
+            if (m){
+              const x = parseFloat(m[1]), y = parseFloat(m[2]);
+              updateBbox(x,y);
+              updateBbox(x+40, y+30);
+            }
+          }
+    
+          for (const child of Array.from(el.children || [])){
+            walk(child, myFill, myStroke);
+          }
+        }
+    
+        walk(root, root.getAttribute("fill") || "black", root.getAttribute("stroke") || "black");
+        return { doc, root, cellRects, bbox };
+      }
+    
+      function detectGrid(cellRects){
+        const sizeCounts = new Map();
+        for (const c of cellRects){
+          const key = Math.round(c.w) + "," + Math.round(c.h);
+          sizeCounts.set(key, (sizeCounts.get(key)||0) + 1);
+        }
+        if (sizeCounts.size === 0) throw new Error("No stitch-cell rectangles found — this SVG may not match the expected chart structure.");
+        let bestKey = null, bestCount = -1;
+        for (const [k,v] of sizeCounts) if (v > bestCount){ bestCount = v; bestKey = k; }
+        const [cw, ch] = bestKey.split(",").map(Number);
+    
+        const main = cellRects.filter(c => Math.abs(c.w - cw) < 1 && Math.abs(c.h - ch) < 1);
+    
+        const xs = Array.from(new Set(main.map(c => Math.round(c.x*10)/10))).sort((a,b)=>a-b);
+        const ys = Array.from(new Set(main.map(c => Math.round(c.y*10)/10))).sort((a,b)=>a-b);
+    
+        function spacing(vals){
+          const diffCounts = new Map();
+          for (let i=1;i<vals.length;i++){
+            const d = Math.round((vals[i]-vals[i-1])*10)/10;
+            if (d > 0) diffCounts.set(d, (diffCounts.get(d)||0)+1);
+          }
+          if (diffCounts.size === 0) return cw;
+          let bestD = null, bestC = -1;
+          for (const [d,c] of diffCounts) if (c > bestC){ bestC = c; bestD = d; }
+          return bestD;
+        }
+    
+        const colw = spacing(xs);
+        const rowh = spacing(ys);
+        const x0 = Math.min(...xs), y0 = Math.min(...ys);
+        const ncols = Math.round((Math.max(...xs) - x0) / colw) + 1;
+        const nrows = Math.round((Math.max(...ys) - y0) / rowh) + 1;
+    
+        return { main, x0, y0, colw, rowh, ncols, nrows };
+      }
+    
+      function classifyColors(mainCells){
+        const accentTags = new Map();
+        let nextLetter = 65; // 'A'
+        const usedGreyscale = new Set(); // tracks which of "W"/"M" actually appear
+    
+        function classify(fill){
+          let r,g,b;
+          const m = fill && fill.match(/^rgb\((\d+),(\d+),(\d+)\)$/);
+          if (fill === "white"){ r=g=b=255; }
+          else if (fill === "black" || fill === null || fill === undefined){ r=g=b=0; }
+          else if (m){ r=+m[1]; g=+m[2]; b=+m[3]; }
+          else { r=g=b=128; }
+    
+          if (Math.abs(r-g) < 12 && Math.abs(g-b) < 12 && Math.abs(r-b) < 12){
+            const avg = (r+g+b)/3;
+            if (avg > 240){ usedGreyscale.add("W"); return "W"; }
+            if (avg >= 150) return null;
+            usedGreyscale.add("M");
+            return "M";
+          } else {
+            const key = [Math.floor(r/16), Math.floor(g/16), Math.floor(b/16)].join(",");
+            if (!accentTags.has(key)){
+              accentTags.set(key, String.fromCharCode(nextLetter));
+              nextLetter++;
+            }
+            return accentTags.get(key);
+          }
+        }
+        return { classify, accentTags, usedGreyscale };
+      }
+    
+    
+      function buildGrid(mainCells, x0, y0, colw, rowh, ncols, nrows, classify){
+        const grid = new Map(); // key "row,col" -> value
+        for (const {x,y,fill} of mainCells){
+          const i = Math.round((x - x0) / colw);
+          const j = Math.round((y - y0) / rowh);
+          const col = ncols - i;
+          const row = nrows - j;
+          grid.set(row + "," + col, classify(fill));
+        }
+        return grid;
+      }
+    
+      function findRuns(grid, ncols, nrows, minRun, reading){
+        const results = new Map(); // "row,firstCol" -> {value, length}
+    
+        // Right-to-left traversal: col 1 (chart's rightmost stitch) first.
+        const rtl = [];
+        for (let c=1;c<=ncols;c++) rtl.push(c);
+        // Left-to-right traversal: the mirror image, for WS rows worked flat.
+        const ltr = [];
+        for (let c=ncols;c>=1;c--) ltr.push(c);
+    
+        // "round": every round is worked with the RS always facing you, so
+        // every row is read the same direction (right to left).
+        // "flat": the work is turned each row, so direction alternates. Which
+        // physical direction row 1 uses depends on whether it's an RS or WS
+        // row -- an RS row reads right to left, a WS row reads left to right.
+        function colRangeForRow(r){
+          if (reading.mode !== "flat") return rtl;
+          const row1IsRS = reading.firstRowSide !== "ws";
+          const thisRowIsRS = row1IsRS ? (r % 2 === 1) : (r % 2 === 0);
+          return thisRowIsRS ? rtl : ltr;
+        }
+    
+        for (let r=1;r<=nrows;r++){
+          const colRange = colRangeForRow(r);
+          const seq = colRange.map(c => [c, grid.has(r+","+c) ? grid.get(r+","+c) : undefined]);
+          let i = 0;
+          const n = seq.length;
+          while (i < n){
+            const [c, v] = seq[i];
+            if (v === null || v === undefined){ i++; continue; }
+            let j = i;
+            while (j < n && seq[j][1] === v) j++;
+            const runLen = j - i;
+            if (runLen >= minRun){
+              const firstCol = seq[i][0];
+              results.set(r+","+firstCol, {value:v, length:runLen});
+            }
+            i = j;
+          }
+        }
+        return results;
+      }
+    
+      function findLegendClusterThreshold(svgText, mergeGap, margin){
+        mergeGap = mergeGap || 150;
+        margin = margin || 50;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgText, "image/svg+xml");
+        let keyEl = null;
+        const all = doc.documentElement.querySelectorAll("*");
+        for (const el of all){
+          if (el.getAttribute && el.getAttribute("desc") === "Key"){ keyEl = el; break; }
+        }
+        if (!keyEl) return Infinity;
+    
+        const xs = [];
+        const NUMRE = /-?\d+\.?\d*/g;
+        function collect(el){
+          const tag = el.tagName ? el.tagName.replace(/^svg:/,"").toLowerCase() : "";
+          if (tag === "rect"){
+            const x = el.getAttribute("x");
+            if (x !== null) xs.push(parseFloat(x));
+          } else if (tag === "path"){
+            const nums = (el.getAttribute("d")||"").match(NUMRE) || [];
+            const pts = nums.map(Number);
+            if (pts.length){
+              const evenPts = pts.filter((_,idx)=>idx%2===0);
+              xs.push(Math.min(...evenPts));
+            }
+          }
+          for (const child of Array.from(el.children || [])) collect(child);
+        }
+        collect(keyEl);
+        if (!xs.length) return Infinity;
+    
+        const sorted = Array.from(new Set(xs)).sort((a,b)=>a-b);
+        let clusterStart = sorted[sorted.length-1];
+        for (let i=sorted.length-1;i>0;i--){
+          if (sorted[i] - sorted[i-1] < mergeGap){
+            clusterStart = sorted[i-1];
+          } else {
+            break;
+          }
+        }
+        return clusterStart - margin;
+      }
+    
+      function keySubtreeExtraBbox(svgText, keepBelowX){
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svgText, "image/svg+xml");
+        let keyEl = null;
+        const all = doc.documentElement.querySelectorAll("*");
+        for (const el of all){
+          if (el.getAttribute && el.getAttribute("desc") === "Key"){ keyEl = el; break; }
+        }
+        if (!keyEl) return null;
+    
+        const bbox = [Infinity, Infinity, -Infinity, -Infinity];
+        let found = false;
+        function update(x,y){
+          found = true;
+          if (x < bbox[0]) bbox[0]=x;
+          if (y < bbox[1]) bbox[1]=y;
+          if (x > bbox[2]) bbox[2]=x;
+          if (y > bbox[3]) bbox[3]=y;
+        }
+        const NUMRE = /-?\d+\.?\d*/g;
+        function walk(el){
+          const tag = el.tagName ? el.tagName.replace(/^svg:/,"").toLowerCase() : "";
+          if (tag === "rect"){
+            const xAttr = el.getAttribute("x");
+            if (xAttr !== null){
+              const x = parseFloat(xAttr);
+              if (x <= keepBelowX){
+                const y = parseFloat(el.getAttribute("y"));
+                const w = parseFloat(el.getAttribute("width"));
+                const h = parseFloat(el.getAttribute("height"));
+                update(x,y); update(x+w,y+h);
+              }
+            }
+          } else if (tag === "path"){
+            const nums = (el.getAttribute("d")||"").match(NUMRE) || [];
+            if (nums.length && parseFloat(nums[0]) <= keepBelowX){
+              for (let i=0;i<nums.length-1;i+=2){
+                const nx = parseFloat(nums[i]), ny = parseFloat(nums[i+1]);
+                if (!isNaN(nx) && !isNaN(ny)) update(nx, ny);
+              }
+            }
+          }
+          for (const child of Array.from(el.children || [])) walk(child);
+        }
+        walk(keyEl);
+        return found ? bbox : null;
+      }
+    
+      function renderSvg(svgText, results, x0, y0, colw, rowh, ncols, nrows, bbox, pad, fontSize){
+        pad = pad === undefined ? 6 : pad;
+        fontSize = fontSize || 15;
+    
+        const keepBelowX = findLegendClusterThreshold(svgText);
+        const extra = keySubtreeExtraBbox(svgText, keepBelowX);
+        let [minx,miny,maxx,maxy] = bbox;
+        if (extra){
+          minx = Math.min(minx, extra[0]);
+          miny = Math.min(miny, extra[1]);
+          maxx = Math.max(maxx, extra[2]);
+          maxy = Math.max(maxy, extra[3]);
+        }
+    
+        const wMatch = svgText.match(/width="([\d.]+)"/);
+        const hMatch = svgText.match(/height="([\d.]+)"/);
+        const vbMatch = svgText.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+    
+        minx -= pad; miny -= pad; maxx += pad; maxy += pad;
+        const newW = maxx - minx, newH = maxy - miny;
+    
+        let out = svgText;
+        if (wMatch) out = out.replace(`width="${wMatch[1]}"`, `width="${newW.toFixed(2)}"`);
+        if (hMatch) out = out.replace(`height="${hMatch[1]}"`, `height="${newH.toFixed(2)}"`);
+        if (vbMatch){
+          out = out.replace(
+            `viewBox="0 0 ${vbMatch[1]} ${vbMatch[2]}"`,
+            `viewBox="${minx.toFixed(2)} ${miny.toFixed(2)} ${newW.toFixed(2)} ${newH.toFixed(2)}"`
+          );
+        }
+    
+        const baselineAdjust = fontSize * 0.35;
+        let labelElems = "";
+        for (const [key, {value, length}] of results){
+          const [r, c] = key.split(",").map(Number);
+          const j = nrows - r;
+          const ytop = y0 + j * rowh;
+          const i = ncols - c;
+          const xleft = x0 + i * colw;
+          const cx = xleft + colw/2;
+          const cy = ytop + rowh/2 + baselineAdjust;
+          const color = value === "M" ? "white" : "black";
+          labelElems += `<text x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" font-family="Tahoma, sans-serif" font-size="${fontSize}" font-weight="bold" fill="${color}" stroke="none">${length}</text>`;
+        }
+        const labelsGroup = `<g id="runLengthLabels">${labelElems}</g>`;
+        out = out.replace("</svg>", labelsGroup + "</svg>");
+        return out;
+      }
+    
+      function processSvgFile(file, minRun, reading){
+        const reader = new FileReader();
+        reader.onload = function(){
+          const svgText = reader.result;
+          try {
+            const { cellRects, bbox } = parseSvgDoc(svgText);
+            const { main, x0, y0, colw, rowh, ncols, nrows } = detectGrid(cellRects);
+            const { classify, accentTags, usedGreyscale } = classifyColors(main);
+            const grid = buildGrid(main, x0, y0, colw, rowh, ncols, nrows, classify);
+            const results = findRuns(grid, ncols, nrows, minRun, reading);
+            const outSvg = renderSvg(svgText, results, x0, y0, colw, rowh, ncols, nrows, bbox, 6, 15);
+    
+            showSvgResult(outSvg, file.name, {
+              ncols, nrows, nLabels: results.size,
+              totalColors: accentTags.size + usedGreyscale.size
+            });
+          } catch (err) {
+            console.error(err);
+            showError("Couldn't parse this SVG as a stitch chart: " + err.message +
+              "\n\nThis parser expects StitchMastery-style exports (paired fill/border " +
+              "rects per cell, legend in a group tagged desc=\"Key\"). A different " +
+              "charting tool's export may need different assumptions.");
+          }
+        };
+        reader.onerror = () => showError("Couldn't read the file.");
+        reader.readAsText(file);
+      }
+    
+      function showSvgResult(svgString, origName, stats){
+        const preview = document.getElementById("preview");
+        preview.innerHTML = svgString;
+        document.getElementById("stats").textContent =
+          `${stats.ncols}×${stats.nrows} grid · ${stats.nLabels} labels · ${stats.totalColors} colour(s) in chart`;
+    
+        const blob = new Blob([svgString], {type: "image/svg+xml"});
+        const url = URL.createObjectURL(blob);
+        const link = document.getElementById("download-link");
+        link.href = url;
+        const base = origName.replace(/\.svg$/i, "");
+        link.download = base + "-labeled.svg";
+    
+        resultSection.classList.add("show");
+        resultSection.scrollIntoView({behavior:"smooth", block:"nearest"});
+      }
+    
+      // =======================================================================
+      // RASTER PATH — canvas pixel-sampling fallback (PNG/JPG)
+      // Ported from references/raster-fallback.md's documented method.
+      // =======================================================================
+    
+      function processRasterFile(file, minRun, reading){
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = function(){
+          img.onload = function(){
+            try {
+              labelRasterImage(img, file.name, minRun, reading);
+            } catch (err){
+              console.error(err);
+              showError("Couldn't read a chart grid from this image: " + err.message +
+                "\n\nRaster detection relies on finding regular gridlines. Scans/photos " +
+                "with skew, glare, or low contrast may not work — an SVG export will " +
+                "be far more reliable if you can get one.");
+            }
+          };
+          img.onerror = () => showError("Couldn't load this image file.");
+          img.src = reader.result;
+        };
+        reader.onerror = () => showError("Couldn't read the file.");
+        reader.readAsDataURL(file);
+      }
+    
+      function labelRasterImage(img, origName, minRun, reading){
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d", {willReadFrequently:true});
+        ctx.drawImage(img, 0, 0);
+        const W = canvas.width, H = canvas.height;
+        const data = ctx.getImageData(0,0,W,H).data;
+    
+        function pixelAt(x,y){
+          x = Math.max(0, Math.min(W-1, Math.round(x)));
+          y = Math.max(0, Math.min(H-1, Math.round(y)));
+          const idx = (y*W + x) * 4;
+          return [data[idx], data[idx+1], data[idx+2]];
+        }
+    
+        // --- 1. Find grid spacing by detecting gridline columns/rows. ---
+        // Gridlines can be lighter OR darker than the cell fill they sit between
+        // (e.g. a mid-grey line reads as a dip between white cells, but as a
+        // bump between dark cells) — so we detect EDGES (magnitude of change
+        // between neighbouring pixels), not raw darkness, and we accumulate
+        // that edge signal across many scanlines rather than just one, since a
+        // single scanline can cross a run of same-colour cells with no gridline
+        // signal at all (common on charts with big solid blocks of one colour).
+        function luminance(x,y){
+          const [r,g,b] = pixelAt(x,y);
+          return (r+g+b)/3;
+        }
+    
+        function edgeProfile(length, otherAxisRange, sampleFn){
+          // sampleFn(pos, otherPos) -> luminance
+          const profile = new Float64Array(length);
+          for (const other of otherAxisRange){
+            let prev = sampleFn(0, other);
+            for (let p=1; p<length; p++){
+              const v = sampleFn(p, other);
+              profile[p] += Math.abs(v - prev);
+              prev = v;
+            }
+          }
+          return profile;
+        }
+    
+        function findPeaks(profile, threshMult){
+          let sum = 0;
+          for (let i=0;i<profile.length;i++) sum += profile[i];
+          const mean = sum / profile.length;
+          const threshold = mean * threshMult;
+          const peaks = [];
+          let p = 1;
+          while (p < profile.length - 1){
+            if (profile[p] > threshold && profile[p] >= profile[p-1] && profile[p] >= profile[p+1]){
+              peaks.push(p);
+              p += 5; // skip past a wide peak so it isn't counted twice
+            } else {
+              p++;
+            }
+          }
+          return peaks;
+        }
+    
+        function modeOfDiffs(peaks){
+          const counts = new Map();
+          for (let i=1;i<peaks.length;i++){
+            const d = peaks[i]-peaks[i-1];
+            counts.set(d, (counts.get(d)||0)+1);
+          }
+          let bestD = null, bestC = -1;
+          for (const [d,c] of counts) if (c > bestC){ bestC = c; bestD = d; }
+          return bestD;
+        }
+    
+        // Longest run of peaks spaced ~period apart -- filters out noise
+        // (legend icons/text, stray marks) that doesn't share the chart's rhythm.
+        function longestConsistentChain(peaks, period, tol){
+          let best = [], cur = [peaks[0]];
+          for (let i=1;i<peaks.length;i++){
+            if (Math.abs(peaks[i] - cur[cur.length-1] - period) <= tol){
+              cur.push(peaks[i]);
+            } else {
+              if (cur.length > best.length) best = cur;
+              cur = [peaks[i]];
+            }
+          }
+          if (cur.length > best.length) best = cur;
+          return best;
+        }
+    
+        // ROWS: sample many columns (skip a margin on the right in case a
+        // legend sits there) to build a horizontal-gridline profile.
+        const rowSampleXs = [];
+        for (let x = Math.round(W*0.02); x < Math.round(W*0.85); x += Math.max(1, Math.round(W/700))) rowSampleXs.push(x);
+        const rowProfile = edgeProfile(H, rowSampleXs, (y,x) => luminance(x,y));
+        const rowRaw = findPeaks(rowProfile, 3);
+        if (rowRaw.length < 3) throw new Error("Couldn't detect a regular row grid in this image.");
+        const rowh = modeOfDiffs(rowRaw);
+        const rowChain = longestConsistentChain(rowRaw, rowh, 3);
+        const y0 = rowChain[0];
+        const yLast = rowChain[rowChain.length-1];
+        const nrows = Math.max(1, Math.round((yLast - y0) / rowh));
+    
+        // COLUMNS: sample many rows to build a vertical-gridline profile.
+        const colSampleYs = [];
+        for (let y = Math.round(H*0.03); y < Math.round(H*0.97); y += Math.max(1, Math.round(H/500))) colSampleYs.push(y);
+        const colProfile = edgeProfile(W, colSampleYs, (x,y) => luminance(x,y));
+        const colRaw = findPeaks(colProfile, 3);
+        if (colRaw.length < 3) throw new Error("Couldn't detect a regular column grid in this image.");
+        const colw = modeOfDiffs(colRaw);
+    
+        if (!colw || !rowh || colw < 4 || rowh < 4){
+          throw new Error("Detected grid spacing looks too small to be real stitch cells.");
+        }
+    
+        // De-duplicate near-identical peaks (e.g. a coloured border line sitting
+        // right next to a real gridline can register as two close peaks).
+        const colDeduped = [colRaw[0]];
+        for (const p of colRaw.slice(1)){
+          if (p - colDeduped[colDeduped.length-1] > colw/3) colDeduped.push(p);
+        }
+        // The right edge of the real grid is the end of the longest run that
+        // stays on-rhythm; legend content breaks rhythm and gets excluded.
+        const colChain = longestConsistentChain(colDeduped, colw, 2);
+        const rightEdge = colChain[colChain.length-1];
+        const chainAnchor = colChain[0];
+    
+        // The left edge of a shaped chart (short rows / raglan diagonals) can be
+        // genuinely sparse -- most rows don't reach the leftmost columns, so
+        // they may not produce strong enough peaks on their own. Instead, look
+        // for the leftmost non-background ink anywhere within the row band
+        // (some row will reach all the way over), then snap that to the grid's
+        // known phase so it lands exactly on a real boundary.
+        let leftInk = W;
+        for (let y = y0; y < yLast; y += 4){
+          for (let x = 0; x < rightEdge + colw; x++){
+            const [r,g,b] = pixelAt(x,y);
+            if (r !== 255 || g !== 255 || b !== 255){ if (x < leftInk) leftInk = x; break; }
+          }
+        }
+        const x0 = chainAnchor - colw * Math.round((chainAnchor - leftInk) / colw);
+        const ncols = Math.max(1, Math.round((rightEdge - x0) / colw));
+    
+        // --- 2. Classify each cell by sampling multiple points, majority vote. ---
+        const accentTags = new Map();
+        let nextLetter = 65;
+        const usedGreyscale = new Set(); // tracks which of "W"/"M" actually appear
+    
+        function classifyRGB(r,g,b){
+          if (Math.abs(r-g) < 14 && Math.abs(g-b) < 14 && Math.abs(r-b) < 14){
+            const avg = (r+g+b)/3;
+            if (avg > 235){ usedGreyscale.add("W"); return "W"; }
+            if (avg >= 140) return null; // no-stitch / blank margin
+            usedGreyscale.add("M");
+            return "M";
+          }
+          const key = [Math.floor(r/16), Math.floor(g/16), Math.floor(b/16)].join(",");
+          if (!accentTags.has(key)){
+            accentTags.set(key, String.fromCharCode(nextLetter));
+            nextLetter++;
+          }
+          return accentTags.get(key);
+        }
+    
+        function classifyCell(cx, cy){
+          // sample 5 points avoiding dead-center (symbols often sit there)
+          const offs = [[0,0],[-colw*0.25,-rowh*0.25],[colw*0.25,-rowh*0.25],
+                        [-colw*0.25,rowh*0.25],[colw*0.25,rowh*0.25]];
+          const votes = new Map();
+          for (const [dx,dy] of offs){
+            const [r,g,b] = pixelAt(cx+dx, cy+dy);
+            const cls = classifyRGB(r,g,b);
+            const k = cls === null ? "__null__" : cls;
+            votes.set(k, (votes.get(k)||0)+1);
+          }
+          let best = null, bestC = -1;
+          for (const [k,c] of votes) if (c > bestC){ bestC = c; best = k; }
+          return best === "__null__" ? null : best;
+        }
+    
+        // Check if a cell is "blank margin" (no border at all -- pure background,
+        // e.g. outside a shaped/short-row chart's actual stitch area). Checks a
+        // short strip along the top edge rather than a single pixel, since a
+        // 1-2px gridline can otherwise be missed entirely.
+        function cellHasBorder(cx, cyTop){
+          const halfw = Math.max(4, Math.round(colw*0.3));
+          for (let dx = -halfw; dx <= halfw; dx += 2){
+            const [r,g,b] = pixelAt(cx+dx, cyTop);
+            if (r !== 255 || g !== 255 || b !== 255) return true;
+          }
+          return false;
+        }
+    
+        const grid = new Map();
+        for (let j=0;j<nrows;j++){
+          for (let i=0;i<ncols;i++){
+            const cx = x0 + i*colw + colw/2;
+            const cyTop = y0 + j*rowh + 1;
+            const cy = y0 + j*rowh + rowh/2;
+            const col = ncols - i;
+            const row = nrows - j;
+            if (!cellHasBorder(cx, cyTop)){
+              continue; // excluded, treated as no-stitch
+            }
+            grid.set(row+","+col, classifyCell(cx, cy));
+          }
+        }
+    
+        const results = findRuns(grid, ncols, nrows, minRun, reading);
+    
+        // --- 3. Draw labels onto the canvas and export as PNG. ---
+        const fontSize = Math.max(10, Math.round(Math.min(colw, rowh) * 0.55));
+        ctx.font = `bold ${fontSize}px Tahoma, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (const [key, {value, length}] of results){
+          const [r, c] = key.split(",").map(Number);
+          const j = nrows - r;
+          const i = ncols - c;
+          const cx = x0 + i*colw + colw/2;
+          const cy = y0 + j*rowh + rowh/2;
+          ctx.fillStyle = value === "M" ? "white" : "black";
+          ctx.fillText(String(length), cx, cy);
+        }
+    
+        const dataUrl = canvas.toDataURL("image/png");
+        showRasterResult(dataUrl, origName, {
+          ncols, nrows, nLabels: results.size, totalColors: accentTags.size + usedGreyscale.size
+        });
+      }
+    
+      function showRasterResult(dataUrl, origName, stats){
+        const preview = document.getElementById("preview");
+        preview.innerHTML = "";
+        const imgEl = document.createElement("img");
+        imgEl.src = dataUrl;
+        preview.appendChild(imgEl);
+    
+        document.getElementById("stats").textContent =
+          `${stats.ncols}×${stats.nrows} grid (estimated) · ${stats.nLabels} labels · ${stats.totalColors} colour(s) in chart`;
+    
+        const link = document.getElementById("download-link");
+        link.href = dataUrl;
+        const base = origName.replace(/\.(png|jpe?g)$/i, "");
+        link.download = base + "-labelled.png";
+    
+        resultSection.classList.add("show");
+        resultSection.scrollIntoView({behavior:"smooth", block:"nearest"});
+      }
+    
+    })();
+    </script>
+</body>
+</html>

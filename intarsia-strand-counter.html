@@ -1,0 +1,2107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>html{color-scheme:light}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Intarsia Strand Counter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a working bench. Left rail = chart input and settings; right = chart diagram, then tabbed counts. */
+:root {
+  --bg: #eef1f4;
+  --surface: #ffffff;
+  --sunk: #f5f7f9;
+  --ink: #1b2230;
+  --muted: #5a6475;
+  --line: #d6dce4;
+  --accent: #2a5b86;
+  --accent-soft: #e2ebf4;
+  --accent-ink: #ffffff;
+  --warn: #9a5b00;
+  --warn-soft: #fbefd9;
+  --grid: rgba(27, 34, 48, 0.18);
+  --grid-strong: rgba(27, 34, 48, 0.45);
+  --outline: #121722;
+  --dim: rgba(238, 241, 244, 0.78);
+  --wash: rgba(238, 241, 244, 0.55);
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11151b; --surface: #191f27; --sunk: #151a21; --ink: #e5e9ef; --muted: #9aa5b6; --line: #2b3440;
+    --accent: #86b6e2; --accent-soft: #1d2b3b; --accent-ink: #0d1520; --warn: #f0b55a; --warn-soft: #33270f;
+    --grid: rgba(229, 233, 239, 0.16); --grid-strong: rgba(229, 233, 239, 0.42); --outline: #05070a; --dim: rgba(17, 21, 27, 0.78); --wash: rgba(17, 21, 27, 0.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11151b; --surface: #191f27; --sunk: #151a21; --ink: #e5e9ef; --muted: #9aa5b6; --line: #2b3440;
+  --accent: #86b6e2; --accent-soft: #1d2b3b; --accent-ink: #0d1520; --warn: #f0b55a; --warn-soft: #33270f;
+  --grid: rgba(229, 233, 239, 0.16); --grid-strong: rgba(229, 233, 239, 0.42); --outline: #05070a; --dim: rgba(17, 21, 27, 0.78); --wash: rgba(17, 21, 27, 0.5);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); }
+.wrap { max-width: 1440px; margin: 0 auto; padding-inline: 20px; padding-block: 20px 48px; display: grid; gap: 20px; }
+header.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+header.top h1 { font: 700 clamp(24px, 3vw, 32px)/1.1 var(--f-display); letter-spacing: -0.01em; margin: 0; }
+header.top p { margin: 0; color: var(--muted); max-width: 70ch; }
+.bench { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 960px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+aside.panel { display: grid; }
+aside section { padding: 16px; display: grid; gap: 10px; border-bottom: 1px solid var(--line); }
+aside section:last-child { border-bottom: 0; }
+h2 { font: 600 12px/1.2 var(--f-body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; }
+h3 { font: 600 18px/1.2 var(--f-display); margin: 0; }
+label { font-weight: 500; }
+.hint { color: var(--muted); font-size: 13px; margin: 0; }
+.drop { border: 1.5px dashed var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 8px; justify-items: start; background: var(--sunk); transition: border-color .15s, background .15s; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.file-name { font-family: var(--f-mono); font-size: 12px; color: var(--muted); word-break: break-all; }
+button, .btn { font: 500 14px var(--f-body); border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 7px 12px; cursor: pointer; }
+button:hover, .btn:hover { border-color: var(--accent); }
+button.primary, .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:focus-visible, input:focus-visible, .btn:focus-within, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.btn { position: relative; display: inline-block; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 7px 14px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+input[type=number], input[type=text] { font: 14px var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; min-width: 0; }
+input[type=number] { width: 76px; font-family: var(--f-mono); }
+.field { display: grid; gap: 4px; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.fields .field span { font-size: 12px; color: var(--muted); }
+.fields input { width: 100%; }
+.legend { display: grid; gap: 6px; }
+.legend-item { display: grid; grid-template-columns: 28px 22px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.swatch { width: 28px; height: 22px; border-radius: 4px; border: 1px solid var(--grid-strong); }
+.legend-item .letter { font: 600 13px var(--f-mono); text-align: center; }
+.legend-item input[type=text] { width: 100%; }
+.legend-item.off .swatch { background-image: repeating-linear-gradient(45deg, transparent 0 4px, rgba(0,0,0,.25) 4px 5px); }
+.legend-item.off input[type=text] { color: var(--muted); text-decoration: line-through; }
+.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 400; color: var(--muted); white-space: nowrap; }
+#imgPanel canvas { width: 100%; height: auto; border-radius: 6px; border: 1px solid var(--line); background: var(--sunk); }
+.warnbox { background: var(--warn-soft); color: var(--warn); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+
+main { display: grid; gap: 20px; min-width: 0; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.stat { background: var(--surface); padding: 12px 14px; display: grid; gap: 2px; align-content: start; }
+.stat b { font: 700 26px/1.1 var(--f-display); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); }
+.chart-card { display: grid; min-width: 0; position: relative; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.toolbar .grow { flex: 1; }
+.toolbar input[type=range] { width: 120px; accent-color: var(--accent); }
+.selbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 16px; background: var(--accent-soft); border-bottom: 1px solid var(--line); font-size: 14px; }
+.selbar b { font-family: var(--f-mono); }
+.chart-scroll { overflow: auto; max-height: 78vh; position: relative; background: var(--sunk); border-radius: 0 0 var(--r) var(--r); }
+#chart { display: block; cursor: crosshair; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; line-height: 1.4; padding: 6px 8px; border-radius: 5px; white-space: nowrap; z-index: 2; }
+.keyline { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 10px 16px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+.keyline i { display: inline-block; vertical-align: middle; margin-right: 6px; }
+.k-out { width: 16px; height: 12px; border: 2px solid var(--ink); }
+.journeybar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--sunk); font-size: 14px; }
+.journeybar input[type=range] { flex: 1 1 200px; min-width: 140px; accent-color: var(--accent); }
+.journeybar select { font: 14px var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px; }
+#jPlay { min-width: 84px; }
+#dsMode[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+#chart.marking { cursor: cell; touch-action: none; }
+.k-ds { width: 14px; height: 12px; position: relative; }
+.chooser { position: absolute; z-index: 3; width: 330px; max-width: calc(100% - 16px); background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 8px 28px rgba(0,0,0,.22); padding: 12px; display: grid; gap: 8px; font-size: 14px; }
+.chooser h4 { margin: 0; font: 600 15px var(--f-display); }
+.chooser .opts { display: grid; gap: 4px; }
+.chooser .opt { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; gap: 8px; align-items: center; text-align: left; padding: 6px 8px; }
+.chooser .opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.chooser .opt .swatch { width: 18px; height: 16px; }
+.chooser .opt small { color: var(--muted); font-family: var(--f-mono); font-size: 12px; white-space: nowrap; }
+.chooser .links { display: flex; flex-wrap: wrap; gap: 6px; }
+.k-choice { width: 12px; height: 12px; background: linear-gradient(225deg, #fff 50%, transparent 50%); outline: 1px solid var(--ink); }
+.k-ds::before { content: ""; position: absolute; inset: 0; border: solid var(--ink); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg) scale(0.7); transform-origin: center; }
+button.tag { border: 0; cursor: pointer; font: inherit; font-size: 11px; }
+button.tag:hover { text-decoration: underline; }
+aside select { font: 14px var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; }
+.savedlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
+.savedlist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
+.savedlist li.current { border-color: var(--accent); background: var(--accent-soft); }
+.savedlist .nm { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.savedlist .meta { grid-column: 1; font-size: 12px; color: var(--muted); }
+.savedlist .acts { grid-column: 2; grid-row: 1 / span 2; display: flex; gap: 4px; }
+.savedlist button { padding: 4px 8px; font-size: 13px; }
+.savedlist button.danger { color: #b3261e; }
+.saved, .dl { display: grid; gap: 6px; }
+details.own summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+details.own[open] summary { margin-bottom: 8px; }
+details.own input { width: 100%; }
+td .range { white-space: nowrap; }
+#jPos { font-family: var(--f-mono); font-size: 13px; color: var(--muted); min-width: 21ch; font-variant-numeric: tabular-nums; }
+.k-snake { width: 26px; height: 8px; border-radius: 4px; background: var(--accent); outline: 1.5px solid var(--ink); position: relative; }
+.k-snake::after { content: ""; position: absolute; right: -4px; top: -4px; width: 12px; height: 14px; border-radius: 50%; background: var(--accent); outline: 1.5px solid var(--ink); }
+.k-float { width: 22px; height: 4px; background: var(--accent); outline: 1px solid var(--ink); }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 12px 0; border-bottom: 1px solid var(--line); align-items: end; }
+.tabs [role=tab] { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 10px; color: var(--muted); }
+.tabs [role=tab][aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs .grow { flex: 1; }
+.tabs .copy { margin-bottom: 6px; }
+.tabpanel { padding: 4px 0 8px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; position: sticky; top: 0; background: var(--surface); }
+td.num, th.num { text-align: right; font-family: var(--f-mono); font-size: 13px; }
+tbody tr.clickable { cursor: pointer; }
+tbody tr.clickable:hover { background: var(--sunk); }
+tbody tr.sel { background: var(--accent-soft); }
+tfoot td { font-weight: 600; border-bottom: 0; }
+.cname { display: inline-flex; gap: 8px; align-items: center; }
+.cname .swatch { width: 18px; height: 14px; }
+.tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); margin-left: 6px; }
+.mono { font-family: var(--f-mono); font-size: 13px; }
+.rows { display: grid; }
+.rowline { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); align-items: start; }
+.rowline .rn { font: 600 13px var(--f-mono); display: grid; }
+.rowline .rn small { font-weight: 400; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 5px; padding: 1px 7px 1px 3px; font: 12px var(--f-mono); cursor: pointer; background: var(--surface); color: var(--ink); }
+.chip .swatch { width: 12px; height: 12px; border-radius: 3px; }
+.chip.sel { border-color: var(--accent); background: var(--accent-soft); }
+.float { font: 11px var(--f-mono); color: var(--muted); }
+.notes { font-size: 12px; color: var(--muted); width: 100%; }
+.howto { padding: 16px; display: grid; gap: 8px; }
+.howto ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; max-width: 80ch; color: var(--muted); }
+.howto b { color: var(--ink); font-weight: 600; }
+.empty { padding: 20px 16px; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Intarsia Strand Counter</h1>
+    <p>Upload a colourwork chart and see how many bobbins each colour needs, where each strand runs, and what gets carried behind.</p>
+  </header>
+
+  <div class="bench">
+    <aside class="panel" aria-label="Chart and settings">
+      <section>
+        <h2>Chart</h2>
+        <div class="drop" id="drop">
+          <label class="btn primary">Choose chart file
+            <input type="file" id="file" accept=".svg,image/svg+xml,image/png,image/jpeg,image/webp,image/gif,.json,application/json">
+          </label>
+          <span class="hint">SVG (e.g. StitchMastery export), a PNG/JPG picture, or a saved project file (.json). You can also drop it here.</span>
+          <span class="file-name" id="fileName">Showing the sample cat chart</span>
+        </div>
+        <div id="loadErr" class="warnbox" hidden></div>
+        <button id="exampleBtn" type="button" hidden>Back to the sample chart</button>
+      </section>
+
+      <section>
+        <h2>Save &amp; download</h2>
+        <label class="field"><span>Chart name</span><input type="text" id="projName" value="sample chart (it is a cat)"></label>
+        <div class="row" id="saveRow" hidden>
+          <button type="button" class="primary" id="saveBtn">Save</button>
+          <button type="button" id="saveNewBtn" hidden>Save as new</button>
+        </div>
+        <p class="hint" id="saveMsg" aria-live="polite"></p>
+        <p class="hint" id="saveNote" hidden>Charts are saved in this browser on this device, with no account needed. Clearing your browsing data removes them, so download a project file as a backup or to move a chart to another device.</p>
+        <div class="saved" id="savedWrap" hidden>
+          <span class="hint" id="savedTitle">Your saved charts</span>
+          <ul class="savedlist" id="savedList"></ul>
+        </div>
+        <div class="dl" id="dlWrap" hidden>
+          <span class="hint">Download</span>
+          <div class="row">
+            <button type="button" id="dlProject" title="Everything: chart, colours, settings and duplicate-stitch marks. Open it again with Choose chart file.">Project file</button>
+            <button type="button" id="dlPng">Chart picture</button>
+            <button type="button" id="dlCsv">Current table</button>
+          </div>
+        </div>
+        <p class="hint" id="noSaveHint" hidden>Saving isn't available in this browser (it may be in private mode). Copy the tables with "Copy table" instead.</p>
+      </section>
+
+      <section id="imgPanel" hidden>
+        <h2>Picture grid</h2>
+        <p class="hint">Check the pink grid sits on the chart squares. Adjust if it doesn't.</p>
+        <canvas id="imgPreview"></canvas>
+        <div class="fields">
+          <label class="field"><span>Stitches (columns)</span><input type="number" id="gCols" min="1" step="1"></label>
+          <label class="field"><span>Rows</span><input type="number" id="gRows" min="1" step="1"></label>
+          <label class="field"><span>Square width (px)</span><input type="number" id="gCw" min="2" step="0.01"></label>
+          <label class="field"><span>Square height (px)</span><input type="number" id="gCh" min="2" step="0.01"></label>
+          <label class="field"><span>Grid left edge (px)</span><input type="number" id="gLeft" step="0.5"></label>
+          <label class="field"><span>Grid top edge (px)</span><input type="number" id="gTop" step="0.5"></label>
+        </div>
+        <label class="field"><span class="hint">Colour matching tolerance: <b id="tolVal">40</b></span>
+          <input type="range" id="gTol" min="5" max="120" value="40"></label>
+        <div class="row"><button type="button" id="redetect">Detect grid again</button></div>
+      </section>
+
+      <section>
+        <h2>Knitting</h2>
+        <div class="field">
+          <label id="firstLbl">Row 1 is a</label>
+          <div class="seg" role="group" aria-labelledby="firstLbl">
+            <button type="button" id="rsBtn" aria-pressed="true">RS row</button>
+            <button type="button" id="wsBtn" aria-pressed="false">WS row</button>
+          </div>
+          <p class="hint">RS rows are read right to left, WS rows left to right. Row 1 is the bottom row.</p>
+        </div>
+        <label class="field">
+          <span>Carry yarn behind up to <input type="number" id="carry" min="0" max="20" value="0"> stitches</span>
+          <span class="hint">If the same colour comes back in a row after this many stitches or fewer, it's carried (stranded) behind instead of using a new bobbin. Set 0 for pure intarsia.</span>
+        </label>
+      </section>
+
+      <section>
+        <h2>Duplicate stitch</h2>
+        <p class="hint">Mark squares you'll embroider afterwards. They're knitted in another colour instead, and the strands, map and yarn all update.</p>
+        <button type="button" id="dsMode" aria-pressed="false">Mark squares on the chart</button>
+        <p class="hint" id="dsModeHint" hidden>Click or drag across squares to mark them. Do it again to unmark.</p>
+        <div class="row">
+          <label for="dsSmallN">Strands of up to</label>
+          <input type="number" id="dsSmallN" min="1" max="200" value="4"> <span>sts</span>
+          <button type="button" id="dsSmall">Mark</button>
+        </div>
+        <div class="row">
+          <select id="dsColourSel" aria-label="Colour to mark" style="flex:1;width:auto"></select>
+          <button type="button" id="dsColour">Mark whole colour</button>
+        </div>
+        <label class="field"><span>Knit the marked squares in</span><select id="dsFill"></select></label>
+        <div class="row"><span id="dsCount" class="hint" style="flex:1"></span><button type="button" id="dsClear">Clear marks</button></div>
+      </section>
+
+      <section>
+        <h2>Yarn estimate</h2>
+        <div class="fields">
+          <label class="field"><span>Needle size</span><select id="needle"></select></label>
+          <label class="field"><span>Tail at each end (cm)</span><input type="number" id="tail" min="0" max="100" step="1" value="15"></label>
+        </div>
+        <div class="field">
+          <span id="unitLbl" class="hint">Show lengths in</span>
+          <div class="seg" role="group" aria-labelledby="unitLbl">
+            <button type="button" id="unitM" aria-pressed="true">metres</button>
+            <button type="button" id="unitYd" aria-pressed="false">yards</button>
+          </div>
+        </div>
+        <p class="hint" id="perStitchHint"></p>
+        <details class="own">
+          <summary>Use my own measurement</summary>
+          <label class="field"><span class="hint">Yarn per stitch (mm). Knit 20 stitches with a marked length of yarn, measure what was used and divide by 20.</span>
+            <input type="number" id="ownMm" min="1" max="200" step="0.1" placeholder="e.g. 22"></label>
+        </details>
+        <p class="hint">Each bobbin gets: stitches knit, plus one stitch for every row (the turn), plus half a stitch for every stitch the yarn is carried behind, plus a tail at each end.</p>
+      </section>
+
+      <section>
+        <h2>Colours</h2>
+        <p class="hint">Name your yarns. Tick "not a stitch" for blank or shaping squares.</p>
+        <div class="legend" id="legend"></div>
+      </section>
+    </aside>
+
+    <main>
+      <div class="stats" id="stats"></div>
+
+      <div class="panel chart-card">
+        <div class="toolbar">
+          <h3>Strand map</h3>
+          <span class="grow"></span>
+          <label class="chk"><input type="checkbox" id="optJourney"> Yarn journeys</label>
+          <label class="chk"><input type="checkbox" id="optOutline" checked> Strand outlines</label>
+          <label class="chk"><input type="checkbox" id="optLabels" checked> Strand names</label>
+          <label class="chk"><input type="checkbox" id="optFloats" checked> Carried yarn</label>
+          <label class="chk">Zoom <input type="range" id="zoom" min="4" max="44" value="18"></label>
+        </div>
+        <div class="journeybar" id="journeybar" hidden>
+          <button type="button" id="jPlay" class="primary">Play</button>
+          <input type="range" id="jScrub" min="0" max="1" step="1" value="1" aria-label="How far through the knitting">
+          <span id="jPos" aria-live="off"></span>
+          <label class="chk">Speed <select id="jSpeed">
+            <option value="0.5">½ row/s</option><option value="1">1 row/s</option><option value="2" selected>2 rows/s</option><option value="5">5 rows/s</option><option value="12">12 rows/s</option>
+          </select></label>
+        </div>
+        <div class="selbar" id="selbar" hidden></div>
+        <div class="chart-scroll" id="chartScroll">
+          <canvas id="chart" aria-label="Chart diagram with strands outlined"></canvas>
+          <div class="tip" id="tip" hidden></div>
+        </div>
+        <div class="chooser" id="chooser" role="dialog" aria-label="Choose what to knit in this square" hidden></div>
+        <div class="keyline">
+          <span><i class="k-out"></i>Each outlined shape is worked from one strand (bobbin)</span>
+          <span><i class="k-float"></i>Yarn carried behind the work</span>
+          <span><i class="k-ds"></i>Duplicate stitch later, in the colour of the V</span>
+          <span><i class="k-choice"></i>Corner flag: you can choose what to knit in that square (click it)</span>
+          <span><i class="k-snake"></i>Yarn journeys: each strand's path stitch by stitch, from the yarn tail to the cat's head</span>
+          <span>Row numbers sit on the side the row starts from. Click a square to follow its strand.</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="tabs" role="tablist" aria-label="Counts">
+          <button role="tab" id="tab-colours" aria-selected="true" aria-controls="panel">By colour</button>
+          <button role="tab" id="tab-strands" aria-selected="false" aria-controls="panel">Strands</button>
+          <button role="tab" id="tab-blocks" aria-selected="false" aria-controls="panel">Colour areas</button>
+          <button role="tab" id="tab-rows" aria-selected="false" aria-controls="panel">Row by row</button>
+          <button role="tab" id="tab-ds" aria-selected="false" aria-controls="panel">Duplicate stitch</button>
+          <span class="grow"></span>
+          <button type="button" class="copy" id="copyBtn">Copy table</button>
+        </div>
+        <div class="tabpanel" id="panel" role="tabpanel"></div>
+      </div>
+
+      <div class="panel howto">
+        <h3>How it counts</h3>
+        <ul>
+          <li><b>Strand</b> means one length of yarn, wound on its own bobbin. Each row is split into runs of the same colour, worked in knitting order.</li>
+          <li><b>Carrying:</b> when a colour reappears in the same row after no more than your carry limit, the yarn is stranded behind those stitches and stays the same strand.</li>
+          <li><b>Following up the rows:</b> a strand continues into the next row when that colour's run there sits on or beside the run below (within the carry limit). Where an area splits, the side nearest the hanging yarn keeps it and the other side gets a new strand. Where two areas join, one strand carries on and the other is cut.</li>
+          <li><b>Rows per strand</b> counts the rows that strand is knitted in. <b>Colour areas</b> are connected patches of one colour, with the rows they span.</li>
+          <li>Squares at the very edges of shaped pieces can be marked "not a stitch" in the colour list so they aren't counted.</li>
+        </ul>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+/* Intarsia strand-counting engine. Pure functions, no DOM.
+ *
+ * Grid convention (matches knitting charts):
+ *   cells[r * cols + c]; r = 0 is chart row 1 (bottom), c = 0 is column 1 (rightmost).
+ *   value = palette index, or -1 for "no stitch".
+ * RS rows are worked right-to-left (column 1 first), WS rows left-to-right.
+ */
+const Core = (() => {
+  const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const letter = (i) => (i < 26 ? LETTERS[i] : LETTERS[Math.floor(i / 26) - 1] + LETTERS[i % 26]);
+
+  // ---------------------------------------------------------------- analysis
+  function analyse(grid, opts = {}) {
+    const firstRS = opts.firstRS !== false;
+    const carryMax = Math.max(0, opts.carryMax | 0);
+    const { rows: R, cols: C } = grid;
+    const none = grid.palette.map((p) => !!p.none);
+    const cells = new Int16Array(R * C);
+    for (let i = 0; i < R * C; i++) {
+      const v = grid.cells[i];
+      cells[i] = v < 0 || none[v] ? -1 : v;
+    }
+    const at = (r, c) => cells[r * C + c];
+
+    const cellStrand = new Int32Array(R * C).fill(-1);
+    const strands = [];
+    const perColourCount = [];
+    const rowsOut = [];
+    let prev = [];
+
+    for (let r = 0; r < R; r++) {
+      const rs = firstRS ? r % 2 === 0 : r % 2 === 1;
+      const order = [];
+      if (rs) for (let c = 0; c < C; c++) order.push(c);
+      else for (let c = C - 1; c >= 0; c--) order.push(c);
+
+      // 1. maximal same-colour segments, in work order
+      const segs = [];
+      for (let p = 0; p < C; p++) {
+        const v = at(r, order[p]);
+        if (v < 0) continue;
+        const last = segs[segs.length - 1];
+        if (last && last.colour === v && last.p1 === p - 1) last.p1 = p;
+        else segs.push({ colour: v, p0: p, p1: p });
+      }
+
+      // 2. merge same-colour segments whose gap is short enough to carry
+      const usages = [];
+      const open = new Map(); // colour -> usage currently able to extend
+      for (const s of segs) {
+        let u = open.get(s.colour);
+        if (u) {
+          const lastSeg = u.segs[u.segs.length - 1];
+          const between = [];
+          for (let p = lastSeg.p1 + 1; p < s.p0; p++) if (at(r, order[p]) >= 0) between.push(order[p]);
+          if (between.length <= carryMax) {
+            s.floatBefore = between.length;
+            u.carried.push(...between);
+            if (between.length) u.carryRuns.push(runOf(between));
+            u.segs.push(s);
+            continue;
+          }
+        }
+        s.floatBefore = 0;
+        u = { colour: s.colour, segs: [s], carried: [], carryRuns: [] };
+        usages.push(u);
+        open.set(s.colour, u);
+      }
+      for (const u of usages) {
+        const cs = [];
+        for (const s of u.segs) for (let p = s.p0; p <= s.p1; p++) cs.push(order[p]);
+        u.cols = cs;
+        // the yarn's route through this row, in work order, including stitches it is carried behind
+        u.path = [];
+        for (let p = u.segs[0].p0; p <= u.segs[u.segs.length - 1].p1; p++) {
+          const c = order[p];
+          if (at(r, c) < 0) continue;
+          u.path.push({ r, c, t: r * C + p, carried: at(r, c) !== u.colour || !u.segs.some((s) => p >= s.p0 && p <= s.p1) });
+        }
+        u.knit = cs.length;
+        u.lo = Math.min(...cs, ...u.carried);
+        u.hi = Math.max(...cs, ...u.carried);
+        u.startCol = cs[0];
+        u.endCol = cs[cs.length - 1];
+      }
+
+      // 3. link to strands from the row below
+      const pairs = [];
+      for (let i = 0; i < prev.length; i++)
+        for (let j = 0; j < usages.length; j++) {
+          const a = prev[i], b = usages[j];
+          if (a.colour !== b.colour) continue;
+          const gap = Math.max(0, b.lo - a.hi - 1, a.lo - b.hi - 1);
+          if (gap > carryMax) continue;
+          const overlap = Math.min(a.hi, b.hi) - Math.max(a.lo, b.lo) + 1;
+          pairs.push({ i, j, overlap, dist: Math.abs(a.endCol - b.startCol) });
+        }
+      pairs.sort((x, y) => x.dist - y.dist || y.overlap - x.overlap);
+      const usedPrev = new Set(), usedCur = new Set();
+      for (const p of pairs) {
+        if (usedPrev.has(p.i) || usedCur.has(p.j)) continue;
+        usedPrev.add(p.i); usedCur.add(p.j);
+        usages[p.j].strand = prev[p.i].strand;
+      }
+      const started = [], ended = [];
+      prev.forEach((u, i) => { if (!usedPrev.has(i)) ended.push(u.strand); });
+      usages.forEach((u) => {
+        if (u.strand !== undefined) return;
+        const n = (perColourCount[u.colour] = (perColourCount[u.colour] || 0) + 1);
+        const st = {
+          id: strands.length, colour: u.colour, n,
+          name: letter(u.colour) + n,
+          startRow: r + 1, endRow: r + 1, rowsUsed: 0, knit: 0, carried: 0, carryRows: 0,
+          firstCell: { r, c: u.startCol }, minCol: C, maxCol: -1, path: [],
+        };
+        strands.push(st);
+        u.strand = st.id;
+        started.push(st.id);
+      });
+
+      // 4. tally
+      for (const u of usages) {
+        const st = strands[u.strand];
+        st.endRow = r + 1;
+        st.rowsUsed++;
+        st.knit += u.knit;
+        st.carried += u.carried.length;
+        if (u.carried.length) st.carryRows++;
+        st.minCol = Math.min(st.minCol, u.lo);
+        st.maxCol = Math.max(st.maxCol, u.hi);
+        for (const c of u.cols) cellStrand[r * C + c] = u.strand;
+        st.path.push(...u.path);
+      }
+      const seq = [];
+      for (const u of usages) for (const s of u.segs) seq.push({ s, u });
+      seq.sort((a, b) => a.s.p0 - b.s.p0);
+      rowsOut.push({
+        row: r + 1, side: rs ? "RS" : "WS", rtl: rs,
+        items: seq.map(({ s, u }) => ({ strand: u.strand, colour: u.colour, n: s.p1 - s.p0 + 1, floatBefore: s.floatBefore })),
+        usages: usages.map((u) => ({ strand: u.strand, colour: u.colour, knit: u.knit, carried: u.carried.length, carryRuns: u.carryRuns })),
+        started, ended,
+      });
+      prev = usages;
+    }
+    // strands still live after the last row end there
+    const lastRow = rowsOut[rowsOut.length - 1];
+    if (lastRow) lastRow.endedAfter = prev.map((u) => u.strand);
+
+    // 5. colour areas (4-connected blocks)
+    const blocks = findBlocks(cells, R, C, cellStrand);
+
+    // 6. per-colour summary
+    const colours = grid.palette.map((p, i) => ({
+      index: i, strands: 0, knit: 0, carried: 0, blocks: 0, maxAtOnce: 0, maxAtOnceRow: 0,
+    }));
+    for (const st of strands) {
+      const k = colours[st.colour];
+      k.strands++; k.knit += st.knit; k.carried += st.carried;
+    }
+    for (const b of blocks) colours[b.colour].blocks++;
+    let peak = { n: 0, row: 0 };
+    for (const ro of rowsOut) {
+      const counts = {};
+      for (const u of ro.usages) counts[u.colour] = (counts[u.colour] || 0) + 1;
+      for (const k in counts)
+        if (counts[k] > colours[k].maxAtOnce) { colours[k].maxAtOnce = counts[k]; colours[k].maxAtOnceRow = ro.row; }
+      if (ro.usages.length > peak.n) peak = { n: ro.usages.length, row: ro.row };
+    }
+
+    return { rows: R, cols: C, cells, cellStrand, strands, rowsOut, blocks, colours, peak, firstRS, carryMax };
+  }
+
+  function runOf(cols) {
+    return { c0: Math.min(...cols), c1: Math.max(...cols) };
+  }
+
+  function findBlocks(cells, R, C, cellStrand) {
+    const parent = new Int32Array(R * C);
+    for (let i = 0; i < parent.length; i++) parent[i] = i;
+    const find = (x) => { while (parent[x] !== x) x = parent[x] = parent[parent[x]]; return x; };
+    const join = (a, b) => { a = find(a); b = find(b); if (a !== b) parent[b] = a; };
+    for (let r = 0; r < R; r++)
+      for (let c = 0; c < C; c++) {
+        const i = r * C + c, v = cells[i];
+        if (v < 0) continue;
+        if (c + 1 < C && cells[i + 1] === v) join(i, i + 1);
+        if (r + 1 < R && cells[i + C] === v) join(i, i + C);
+      }
+    const map = new Map();
+    for (let r = 0; r < R; r++)
+      for (let c = 0; c < C; c++) {
+        const i = r * C + c;
+        if (cells[i] < 0) continue;
+        const root = find(i);
+        let b = map.get(root);
+        if (!b) {
+          b = { colour: cells[i], stitches: 0, rowLo: r + 1, rowHi: r + 1, colLo: c + 1, colHi: c + 1, strands: new Set(), first: { r, c } };
+          map.set(root, b);
+        }
+        b.stitches++;
+        b.rowLo = Math.min(b.rowLo, r + 1); b.rowHi = Math.max(b.rowHi, r + 1);
+        b.colLo = Math.min(b.colLo, c + 1); b.colHi = Math.max(b.colHi, c + 1);
+        if (cellStrand[i] >= 0) b.strands.add(cellStrand[i]);
+      }
+    const blocks = [...map.values()].sort((a, b) => a.rowLo - b.rowLo || a.colLo - b.colLo);
+    const n = {};
+    for (const b of blocks) {
+      b.n = n[b.colour] = (n[b.colour] || 0) + 1;
+      b.rowsSpanned = b.rowHi - b.rowLo + 1;
+      b.strands = [...b.strands];
+    }
+    return blocks;
+  }
+
+  // ---------------------------------------------------------------- colour helpers
+  const hexToRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const rgbToHex = (rgb) => "#" + rgb.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  const isPlaceholderGrey = ([r, g, b]) => {
+    const avg = (r + g + b) / 3;
+    return Math.max(r, g, b) - Math.min(r, g, b) < 14 && avg >= 150 && avg <= 236;
+  };
+  const luminance = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+
+  /** Greedy clustering. items: array of rgb triples. Returns {palette:[{hex,rgb,count}], index:Int16Array} */
+  function clusterColours(items, tolerance) {
+    const hist = new Map();
+    items.forEach((rgb, i) => {
+      if (!rgb) return;
+      const k = rgbToHex(rgb);
+      let h = hist.get(k);
+      if (!h) hist.set(k, (h = { rgb, count: 0, members: [] }));
+      h.count++; h.members.push(i);
+    });
+    const sorted = [...hist.values()].sort((a, b) => b.count - a.count);
+    const clusters = [];
+    for (const h of sorted) {
+      let best = null, bd = Infinity;
+      for (const cl of clusters) { const d = dist(cl.rgb, h.rgb); if (d < bd) { bd = d; best = cl; } }
+      if (best && bd <= tolerance) { best.members.push(...h.members); best.count += h.count; }
+      else clusters.push({ rgb: h.rgb, count: h.count, members: [...h.members] });
+    }
+    // order palette: most common first
+    clusters.sort((a, b) => b.count - a.count);
+    const index = new Int16Array(items.length).fill(-1);
+    clusters.forEach((cl, ci) => cl.members.forEach((m) => (index[m] = ci)));
+    const palette = clusters.map((cl) => ({ hex: rgbToHex(cl.rgb), rgb: cl.rgb, count: cl.count, none: isPlaceholderGrey(cl.rgb) }));
+    return { palette, index };
+  }
+
+  // ---------------------------------------------------------------- SVG rect -> grid
+  /** rects: [{x,y,w,h,rgb}] (fills already resolved, legend already skipped) */
+  function gridFromRects(rects) {
+    const filled = rects.filter((r) => r.rgb && r.w > 0 && r.h > 0);
+    if (!filled.length) throw new Error("No filled squares found in this SVG.");
+    const sizes = new Map();
+    for (const r of filled) {
+      const k = Math.round(r.w) + "x" + Math.round(r.h);
+      sizes.set(k, (sizes.get(k) || 0) + 1);
+    }
+    const [bestSize, bestCount] = [...sizes.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (bestCount < 4) throw new Error("This SVG doesn't look like a stitch chart (no repeating grid of squares).");
+    const [cw, ch] = bestSize.split("x").map(Number);
+    let main = filled.filter((r) => Math.abs(r.w - cw) < 1.01 && Math.abs(r.h - ch) < 1.01);
+    // drop stray same-size squares far from the chart body (e.g. a legend swatch)
+    const keepCluster = (key, step) => {
+      const vals = [...new Set(main.map((r) => r[key]))].sort((a, b) => a - b);
+      let best = [0, 0], st = 0;
+      for (let i = 1; i < vals.length; i++) {
+        if (vals[i] - vals[i - 1] > step * 3) st = i;
+        if (i - st > best[1] - best[0]) best = [st, i];
+      }
+      const lo = vals[best[0]], hi = vals[best[1]];
+      main = main.filter((r) => r[key] >= lo && r[key] <= hi);
+    };
+    keepCluster("x", cw);
+    keepCluster("y", ch);
+    const spacing = (vals) => {
+      const u = [...new Set(vals.map((v) => Math.round(v * 10) / 10))].sort((a, b) => a - b);
+      const d = new Map();
+      for (let i = 1; i < u.length; i++) { const k = Math.round((u[i] - u[i - 1]) * 10) / 10; if (k > 0.5) d.set(k, (d.get(k) || 0) + 1); }
+      return d.size ? [...d.entries()].sort((a, b) => b[1] - a[1])[0][0] : null;
+    };
+    const colw = spacing(main.map((r) => r.x)) || cw;
+    const rowh = spacing(main.map((r) => r.y)) || ch;
+    const x0 = Math.min(...main.map((r) => r.x)), y0 = Math.min(...main.map((r) => r.y));
+    const cols = Math.round((Math.max(...main.map((r) => r.x)) - x0) / colw) + 1;
+    const rows = Math.round((Math.max(...main.map((r) => r.y)) - y0) / rowh) + 1;
+    if (cols * rows > 400000) throw new Error("Chart is too large (" + cols + " × " + rows + ").");
+    const rgbs = new Array(rows * cols).fill(null);
+    for (const r of main) {
+      const i = Math.round((r.x - x0) / colw), j = Math.round((r.y - y0) / rowh);
+      const c = cols - 1 - i, row = rows - 1 - j;
+      rgbs[row * cols + c] = r.rgb; // later rects paint over earlier ones, like the renderer
+    }
+    const { palette, index } = clusterColours(rgbs, 12);
+    return { rows, cols, cells: index, palette };
+  }
+
+  // ---------------------------------------------------------------- raster -> grid
+  /** img: {width,height,data} RGBA. Returns geometry guess {left,top,cw,ch,cols,rows} or null */
+  function detectGrid(img) {
+    const { width: W, height: H, data } = img;
+    const px = (x, y) => (y * W + x) * 4;
+    const d = (i, j) => Math.abs(data[i] - data[j]) + Math.abs(data[i + 1] - data[j + 1]) + Math.abs(data[i + 2] - data[j + 2]);
+    const colProf = new Float64Array(W), rowProf = new Float64Array(H);
+    for (let y = 0; y < H; y++)
+      for (let x = 1; x < W; x++) colProf[x] += d(px(x, y), px(x - 1, y));
+    for (let y = 1; y < H; y++)
+      for (let x = 0; x < W; x++) rowProf[y] += d(px(x, y), px(x, y - 1));
+    const gx = axis(colProf), gy = axis(rowProf);
+    if (!gx || !gy) return null;
+    return { left: gx.start, top: gy.start, cw: gx.period, ch: gy.period, cols: gx.count, rows: gy.count };
+  }
+
+  function axis(prof) {
+    const n = prof.length;
+    // local maxima = candidate grid lines
+    const peaks = [];
+    for (let x = 1; x < n - 1; x++) if (prof[x] > 0 && prof[x] >= prof[x - 1] && prof[x] > prof[x + 1]) peaks.push({ x, s: prof[x] });
+    if (peaks.length < 4) return null;
+    const ss = peaks.map((p) => p.s).sort((a, b) => a - b);
+    const thr = 0.3 * ss[Math.floor(ss.length * 0.9)];
+    // a drawn line gives two edges a pixel or two apart: merge them into one centre
+    const lines = [];
+    for (const p of peaks) {
+      if (p.s < thr) continue;
+      const last = lines[lines.length - 1];
+      if (last && p.x - last.x1 <= 3) { last.x1 = p.x; last.w += p.s; last.sx += p.x * p.s; }
+      else lines.push({ x0: p.x, x1: p.x, w: p.s, sx: p.x * p.s });
+    }
+    const pos = lines.map((l) => l.sx / l.w);
+    if (pos.length < 3) return null;
+    const diffs = pos.slice(1).map((v, i) => v - pos[i]).filter((d) => d >= 4);
+    if (!diffs.length) return null;
+    const sorted = [...diffs].sort((a, b) => a - b);
+    const period = sorted[Math.floor(sorted.length / 2)];
+    // longest chain of evenly spaced lines
+    let best = [0, 0], st = 0;
+    for (let i = 1; i < pos.length; i++) {
+      const d = pos[i] - pos[i - 1];
+      if (Math.abs(d - period) > period * 0.25) st = i;
+      if (i - st > best[1] - best[0]) best = [st, i];
+    }
+    const [a, b] = best;
+    if (b - a < 2) return null;
+    // least-squares fit of line positions
+    const k = b - a + 1;
+    let sx = 0, sy = 0, sxx = 0, sxy = 0;
+    for (let i = 0; i < k; i++) { const y = pos[a + i]; sx += i; sy += y; sxx += i * i; sxy += i * y; }
+    const slope = (k * sxy - sx * sy) / (k * sxx - sx * sx);
+    const start = (sy - slope * sx) / k;
+    return { start: Math.round(start * 10) / 10, period: Math.round(slope * 1000) / 1000, count: b - a };
+  }
+
+  /** Sample the dominant colour of each cell. Row 1 = bottom row of the geometry, column 1 = right. */
+  function sampleCells(img, g) {
+    const { width: W, height: H, data } = img;
+    const out = new Array(g.rows * g.cols).fill(null);
+    for (let j = 0; j < g.rows; j++)
+      for (let i = 0; i < g.cols; i++) {
+        const x0 = g.left + i * g.cw, y0 = g.top + j * g.ch;
+        const bins = new Map();
+        const steps = 7;
+        for (let a = 0; a < steps; a++)
+          for (let b = 0; b < steps; b++) {
+            const x = Math.round(x0 + g.cw * (0.22 + (0.56 * a) / (steps - 1)));
+            const y = Math.round(y0 + g.ch * (0.22 + (0.56 * b) / (steps - 1)));
+            if (x < 0 || y < 0 || x >= W || y >= H) continue;
+            const p = (y * W + x) * 4;
+            const k = ((data[p] >> 4) << 8) | ((data[p + 1] >> 4) << 4) | (data[p + 2] >> 4);
+            let e = bins.get(k);
+            if (!e) bins.set(k, (e = { n: 0, r: 0, g: 0, b: 0 }));
+            e.n++; e.r += data[p]; e.g += data[p + 1]; e.b += data[p + 2];
+          }
+        let best = null;
+        for (const e of bins.values()) if (!best || e.n > best.n) best = e;
+        if (!best) continue;
+        const row = g.rows - 1 - j, col = g.cols - 1 - i;
+        out[row * g.cols + col] = [best.r / best.n, best.g / best.n, best.b / best.n];
+      }
+    return out;
+  }
+
+  function gridFromImage(img, g, tolerance) {
+    const rgbs = sampleCells(img, g);
+    const { palette, index } = clusterColours(rgbs, tolerance);
+    return { rows: g.rows, cols: g.cols, cells: index, palette };
+  }
+
+  // ---------------------------------------------------------------- yarn estimate
+  // Typical stocking-stitch gauge (stitches per 10 cm, tight..loose) for each metric needle size.
+  const GAUGE = {
+    2.25: [30, 34], 2.5: [29, 32], 2.75: [28, 32], 3: [26, 30], 3.25: [25, 28], 3.5: [23, 26], 3.75: [22, 24],
+    4: [21, 24], 4.5: [18, 21], 5: [16, 20], 5.5: [15, 17], 6: [14, 16], 6.5: [13, 15], 7: [12, 14], 8: [11, 13], 9: [10, 12], 10: [9, 11],
+  };
+  // A knitted stitch uses roughly 4.6-5.6 times its own width in yarn.
+  function yarnPerStitch(needle) {
+    const [lo, hi] = GAUGE[needle];
+    return { lo: (100 / hi) * 4.6, hi: (100 / lo) * 5.6, gauge: [lo, hi] }; // mm
+  }
+  /** Stitch-equivalents for one strand: each knit stitch, plus 1 per row (the turn), plus 1/2 per carried stitch. */
+  function stitchEquivalents(st) {
+    return st.knit + st.rowsUsed + 0.5 * st.carried;
+  }
+  function strandYarn(st, per, tailMm) {
+    const e = stitchEquivalents(st);
+    return { lo: e * per.lo + 2 * tailMm, hi: e * per.hi + 2 * tailMm, equiv: e };
+  }
+
+  // ---------------------------------------------------------------- duplicate stitch
+  /**
+   * Build the chart you actually knit when some squares will be duplicate-stitched later.
+   * marks: Set of cell indices. fillWith: palette index, or -1 for "the surrounding colour".
+   * A marked square is knitted in a colour other than its own: whichever neighbouring colour
+   * dominates (stitches beside it in the same row count double, since that yarn is already there).
+   */
+  function applyDuplicate(grid, marks, fillWith = -1, overrides = null) {
+    const { rows: R, cols: C } = grid;
+    const none = grid.palette.map((p) => !!p.none);
+    const orig = grid.cells;
+    const isStitch = (i) => orig[i] >= 0 && !none[orig[i]];
+    const cells = Int16Array.from(orig);
+    const pending = new Set();
+    for (const i of marks) if (i >= 0 && i < R * C && isStitch(i)) pending.add(i);
+    const marked = new Set(pending);
+    // squares where the knitter has picked the colour themselves
+    if (overrides) for (const [i, v] of overrides) {
+      if (pending.has(i) && v >= 0 && v < grid.palette.length && !none[v]) { cells[i] = v; pending.delete(i); }
+    }
+    if (fillWith >= 0) {
+      for (const i of pending) cells[i] = fillWith;
+    } else {
+      while (pending.size) {
+        const decided = [];
+        for (const i of pending) {
+          const r = Math.floor(i / C), c = i % C, own = orig[i];
+          const votes = new Map();
+          const vote = (j, w) => {
+            if (j < 0 || pending.has(j) || !isStitch(j)) return;
+            const v = cells[j];
+            if (v === own) return;
+            votes.set(v, (votes.get(v) || 0) + w);
+          };
+          if (c > 0) vote(i - 1, 2);
+          if (c < C - 1) vote(i + 1, 2);
+          if (r > 0) vote(i - C, 1);
+          if (r < R - 1) vote(i + C, 1);
+          // ties go to the colour most common in the surrounding 5 x 5 squares
+          const around = (v) => {
+            let n = 0;
+            for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+              const rr = r + dr, cc = c + dc;
+              if (rr >= 0 && rr < R && cc >= 0 && cc < C && !pending.has(rr * C + cc) && isStitch(rr * C + cc) && cells[rr * C + cc] === v) n++;
+            }
+            return n;
+          };
+          let best = -1, bw = 0;
+          for (const [v, w] of votes) if (w > bw || (w === bw && around(v) > around(best))) { bw = w; best = v; }
+          if (best >= 0) decided.push([i, best]);
+        }
+        if (!decided.length) {
+          // nothing usable next to the remaining squares: use the most common other colour
+          const count = new Map();
+          for (let i = 0; i < R * C; i++) if (isStitch(i) && !pending.has(i)) count.set(cells[i], (count.get(cells[i]) || 0) + 1);
+          for (const i of pending) {
+            let best = -1, bw = -1;
+            for (const [v, w] of count) if (v !== orig[i] && w > bw) { bw = w; best = v; }
+            if (best < 0) best = (orig[i] + 1) % grid.palette.length;
+            cells[i] = best;
+          }
+          break;
+        }
+        for (const [i, v] of decided) { cells[i] = v; pending.delete(i); }
+      }
+    }
+    // patches to embroider: joined squares of the same duplicate-stitch colour
+    const seen = new Set(), patches = [];
+    for (const i of marked) {
+      if (seen.has(i)) continue;
+      const colour = orig[i], stack = [i], patch = { colour, cells: [] };
+      seen.add(i);
+      while (stack.length) {
+        const k = stack.pop();
+        patch.cells.push(k);
+        const r = Math.floor(k / C), c = k % C;
+        for (const [rr, cc] of [[r, c - 1], [r, c + 1], [r - 1, c], [r + 1, c]]) {
+          if (rr < 0 || rr >= R || cc < 0 || cc >= C) continue;
+          const j = rr * C + cc;
+          if (marked.has(j) && !seen.has(j) && orig[j] === colour) { seen.add(j); stack.push(j); }
+        }
+      }
+      patches.push(patch);
+    }
+    return { grid: { rows: R, cols: C, cells, palette: grid.palette }, marked, patches };
+  }
+
+  /** Colours a marked square could sensibly be knitted in: those of the squares beside it (not its own colour). */
+  function duplicateOptions(res, origGrid, i) {
+    const { rows: R, cols: C, cells } = res.grid;
+    const none = origGrid.palette.map((p) => !!p.none);
+    const own = origGrid.cells[i], r = Math.floor(i / C), c = i % C;
+    const out = [];
+    for (const [rr, cc] of [[r, c - 1], [r, c + 1], [r - 1, c], [r + 1, c]]) {
+      if (rr < 0 || rr >= R || cc < 0 || cc >= C) continue;
+      const j = rr * C + cc, v = cells[j];
+      if (origGrid.cells[j] < 0 || none[origGrid.cells[j]] || v === own || out.includes(v)) continue;
+      out.push(v);
+    }
+    if (!out.includes(cells[i])) out.push(cells[i]);
+    return out;
+  }
+
+  /** Duplicate stitch traces each stitch, using roughly 1.6-2.2 times a knitted stitch's yarn. */
+  function duplicateYarn(nStitches, nPatches, per, tailMm) {
+    return { lo: nStitches * per.lo * 1.6 + nPatches * 2 * tailMm, hi: nStitches * per.hi * 2.2 + nPatches * 2 * tailMm };
+  }
+
+  return { analyse, applyDuplicate, duplicateOptions, duplicateYarn, GAUGE, yarnPerStitch, stitchEquivalents, strandYarn, clusterColours, gridFromRects, detectGrid, sampleCells, gridFromImage, letter, hexToRgb, rgbToHex, luminance, isPlaceholderGrey };
+})();
+if (typeof module !== "undefined") module.exports = Core;
+
+</script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => n.toLocaleString("en-GB");
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const state = {
+    projId: null,
+    ds: new Set(), dsFill: -1, dsMode: false, dsInfo: null, dsOver: new Map(), chooseWhole: true,
+    needle: 4, tailCm: 15, units: "m", ownMm: null,
+    grid: null, names: [], analysis: null, firstRS: true, carryMax: 0,
+    sel: null, tab: "colours", zoom: null,
+    image: null, // {data: ImageData, geom, tol}
+  };
+
+  // ------------------------------------------------------------ example chart
+  function exampleGrid() {
+    // Sample chart: a cat among leaves (37 sts x 36 rows), row 1 is RS. Cells run-length encoded, row 1 first, stitch 1 first.
+    const R = 36, C = 37;
+    const cells = new Int16Array(R * C);
+    let k = 0;
+    for (const part of "0*18,1,0*36,1,0*36,1,0*36,1,0*36,1,0*36,1,0,1*8,0*27,1,0*3,1*8,0*16,1*8,0,1,0*4,1*9,0*12,1*8,0*3,1,0*5,1*9,0*9,1*9,0*4,1,0*6,1*8,0*8,1*9,0*5,1,0*7,1*7,0*8,1*8,0*6,1,0*8,1*5,0*9,1*7,0*7,1,0*23,1*5,0*6,1*5,0*30,1*9,0*26,1*13,0*22,1*17,0*18,1*5,2*11,1*5,0*15,1*5,2*13,1*5,0*14,1*4,2*7,3,2*7,1*4,0*14,1*3,2*7,3*3,2*7,1*3,0*14,1*3,2*17,1*3,0*14,1*3,2*3,1*4,2*3,1*4,2*3,1*3,0*15,1*2,2*2,1*2,4,1,2*5,1,4,1*2,2*2,1*2,0*17,1,2*17,1,0*19,2*17,0*20,2*5,0*7,2*5,0*21,2*3,0*9,2*3,0*22,2*3,0*9,2*3,0*23,2,0*11,2,0*234".split(",")) {
+      const [v, n] = part.split("*");
+      for (let t = 0; t < (n ? +n : 1); t++) cells[k++] = +v;
+    }
+    const palette = [
+      { hex: "#c2e6e0", rgb: [194, 230, 224], none: false },
+      { hex: "#99c99c", rgb: [153, 201, 156], none: false },
+      { hex: "#ffffff", rgb: [255, 255, 255], none: false },
+      { hex: "#cd9da1", rgb: [205, 157, 161], none: false },
+      { hex: "#4d3d39", rgb: [77, 61, 57], none: false },
+    ];
+    return { grid: { rows: R, cols: C, cells, palette }, names: ["Sky", "Leaves / eyes", "Cat", "Snoot", "Pupils"] };
+  }
+
+  // ------------------------------------------------------------ loading files
+  const normCanvas = document.createElement("canvas").getContext("2d");
+  function cssColour(str) {
+    if (!str) return null;
+    str = str.trim();
+    if (!str || str === "none" || str === "transparent" || str.startsWith("url(") || str === "currentColor" || str === "inherit") return null;
+    normCanvas.fillStyle = "#010203";
+    normCanvas.fillStyle = str;
+    const v = normCanvas.fillStyle;
+    if (v === "#010203" && str.toLowerCase() !== "#010203") return null;
+    if (v[0] === "#") return Core.hexToRgb(v);
+    const m = v.match(/rgba?\(([^)]+)\)/);
+    if (!m) return null;
+    const parts = m[1].split(",").map((s) => parseFloat(s));
+    if (parts.length === 4 && parts[3] === 0) return null;
+    return parts.slice(0, 3);
+  }
+  function parseTransform(t) {
+    let dx = 0, dy = 0, sx = 1, sy = 1;
+    if (!t) return { dx, dy, sx, sy };
+    const re = /(translate|matrix|scale)\s*\(([^)]*)\)/g;
+    let m;
+    while ((m = re.exec(t))) {
+      const n = m[2].split(/[\s,]+/).filter(Boolean).map(Number);
+      if (m[1] === "translate") { dx += (n[0] || 0) * sx; dy += (n[1] || 0) * sy; }
+      else if (m[1] === "scale") { sx *= n[0]; sy *= n.length > 1 ? n[1] : n[0]; }
+      else if (m[1] === "matrix" && n.length === 6) { dx += n[4] * sx; dy += n[5] * sy; sx *= n[0]; sy *= n[3]; }
+    }
+    return { dx, dy, sx, sy };
+  }
+  function styleProp(el, prop) {
+    const st = el.getAttribute("style");
+    if (!st) return null;
+    const m = st.match(new RegExp("(?:^|;)\\s*" + prop + "\\s*:\\s*([^;]+)"));
+    return m ? m[1].trim() : null;
+  }
+  function parseSvgText(text) {
+    const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+    if (doc.getElementsByTagName("parsererror").length) throw new Error("This SVG file couldn't be read. Is it a complete SVG export?");
+    const rects = [];
+    const isKey = (el) => {
+      if (el.getAttribute("desc") === "Key") return true;
+      for (const ch of el.children) if (ch.localName === "desc" && ch.textContent.trim() === "Key") return true;
+      return false;
+    };
+    const walk = (el, fill, T) => {
+      const tag = el.localName;
+      if (["defs", "clipPath", "mask", "pattern", "symbol", "desc", "title", "metadata", "style", "script"].includes(tag)) return;
+      if (isKey(el)) return;
+      if (el.getAttribute("display") === "none" || styleProp(el, "display") === "none") return;
+      const f = styleProp(el, "fill") ?? el.getAttribute("fill") ?? fill;
+      const t = parseTransform(el.getAttribute("transform"));
+      const M = { dx: T.dx + t.dx * T.sx, dy: T.dy + t.dy * T.sy, sx: T.sx * t.sx, sy: T.sy * t.sy };
+      if (tag === "rect") {
+        const x = parseFloat(el.getAttribute("x") || 0), y = parseFloat(el.getAttribute("y") || 0);
+        const w = parseFloat(el.getAttribute("width")), h = parseFloat(el.getAttribute("height"));
+        if (w > 0 && h > 0) rects.push({ x: M.dx + x * M.sx, y: M.dy + y * M.sy, w: w * Math.abs(M.sx), h: h * Math.abs(M.sy), rgb: cssColour(f) });
+      }
+      for (const ch of el.children) walk(ch, f, M);
+    };
+    walk(doc.documentElement, "black", { dx: 0, dy: 0, sx: 1, sy: 1 });
+    return Core.gridFromRects(rects);
+  }
+
+  function showError(msg) { const e = $("loadErr"); e.textContent = msg; e.hidden = !msg; }
+
+  async function loadFile(file) {
+    showError("");
+    try {
+      const isSvg = /svg/i.test(file.type) || /\.svg$/i.test(file.name);
+      const isProject = /json/i.test(file.type) || /\.json$/i.test(file.name);
+      if (isProject) {
+        let proj;
+        try { proj = JSON.parse(await file.text()); } catch { throw new Error("That project file couldn't be read. Is it a file saved from this app?"); }
+        restoreProject(proj, null);
+        $("fileName").textContent = file.name;
+        $("exampleBtn").hidden = false;
+        return;
+      }
+      if (isSvg) {
+        const grid = parseSvgText(await file.text());
+        state.image = null;
+        $("imgPanel").hidden = true;
+        setGrid(grid, null);
+      } else {
+        const data = await readImage(file);
+        let geom = Core.detectGrid(data);
+        const found = !!geom;
+        if (!geom) geom = { left: 0, top: 0, cols: 20, rows: 20, cw: data.width / 20, ch: data.height / 20 };
+        state.image = { data, geom, tol: +$("gTol").value };
+        $("imgPanel").hidden = false;
+        fillGeomFields();
+        drawPreview();
+        regridImage(true);
+        if (!found) showError("Couldn't find the grid lines in this picture. Enter the number of stitches and rows below, then nudge the grid until it lines up.");
+      }
+      $("fileName").textContent = file.name;
+      $("exampleBtn").hidden = false;
+      $("projName").value = file.name.replace(/\.[^.]+$/, "");
+      state.projId = null; renderSaved();
+    } catch (err) {
+      showError(err.message || String(err));
+    }
+  }
+  function readImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, 3000 / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const ctx = c.getContext("2d", { willReadFrequently: true });
+        ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(ctx.getImageData(0, 0, w, h));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("That picture couldn't be opened.")); };
+      img.src = url;
+    });
+  }
+  const geomFields = { gCols: "cols", gRows: "rows", gCw: "cw", gCh: "ch", gLeft: "left", gTop: "top" };
+  function fillGeomFields() {
+    const g = state.image.geom;
+    for (const [id, k] of Object.entries(geomFields)) $(id).value = k === "cols" || k === "rows" ? g[k] : Math.round(g[k] * 100) / 100;
+  }
+  for (const [id, k] of Object.entries(geomFields))
+    $(id).addEventListener("input", () => {
+      if (!state.image) return;
+      const v = parseFloat($(id).value);
+      if (!isFinite(v)) return;
+      if ((k === "cols" || k === "rows") && (v < 1 || v > 600)) return;
+      if ((k === "cw" || k === "ch") && v < 2) return;
+      state.image.geom[k] = k === "cols" || k === "rows" ? Math.round(v) : v;
+      drawPreview(); regridImage(false);
+    });
+  $("gTol").addEventListener("input", () => {
+    $("tolVal").textContent = $("gTol").value;
+    if (!state.image) return;
+    state.image.tol = +$("gTol").value;
+    regridImage(true);
+  });
+  $("redetect").addEventListener("click", () => {
+    if (!state.image) return;
+    const g = Core.detectGrid(state.image.data);
+    if (!g) { showError("Still couldn't find the grid lines automatically. Set the grid by hand below."); return; }
+    showError("");
+    state.image.geom = g; fillGeomFields(); drawPreview(); regridImage(false);
+  });
+  let regridTimer = 0;
+  function regridImage(resetNames) {
+    clearTimeout(regridTimer);
+    regridTimer = setTimeout(() => {
+      const im = state.image;
+      const grid = Core.gridFromImage(im.data, im.geom, im.tol);
+      const keep = !resetNames && state.grid && state.grid.palette.length === grid.palette.length ? state.names : null;
+      if (keep && state.grid) grid.palette.forEach((p, i) => (p.none = state.grid.palette[i].none));
+      setGrid(grid, keep);
+    }, 60);
+  }
+  function drawPreview() {
+    const im = state.image, cv = $("imgPreview");
+    const maxW = 900, scale = Math.min(1, maxW / im.data.width);
+    cv.width = Math.round(im.data.width * scale); cv.height = Math.round(im.data.height * scale);
+    const ctx = cv.getContext("2d");
+    const tmp = document.createElement("canvas");
+    tmp.width = im.data.width; tmp.height = im.data.height;
+    tmp.getContext("2d").putImageData(im.data, 0, 0);
+    ctx.drawImage(tmp, 0, 0, cv.width, cv.height);
+    const g = im.geom;
+    ctx.strokeStyle = "rgba(255, 30, 140, 0.85)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= g.cols; i++) { const x = (g.left + i * g.cw) * scale; ctx.moveTo(x, g.top * scale); ctx.lineTo(x, (g.top + g.rows * g.ch) * scale); }
+    for (let j = 0; j <= g.rows; j++) { const y = (g.top + j * g.ch) * scale; ctx.moveTo(g.left * scale, y); ctx.lineTo((g.left + g.cols * g.cw) * scale, y); }
+    ctx.stroke();
+  }
+
+  $("file").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) loadFile(f); e.target.value = ""; });
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+  $("exampleBtn").addEventListener("click", () => {
+    const ex = exampleGrid();
+    state.image = null; $("imgPanel").hidden = true; showError("");
+    $("fileName").textContent = "Showing the sample cat chart"; $("exampleBtn").hidden = true;
+    setGrid(ex.grid, ex.names);
+    $("projName").value = "sample chart (it is a cat)"; state.projId = null; renderSaved();
+  });
+
+  // ------------------------------------------------------------ settings
+  function setFirst(rs) {
+    state.firstRS = rs;
+    $("rsBtn").setAttribute("aria-pressed", rs); $("wsBtn").setAttribute("aria-pressed", !rs);
+    recompute();
+  }
+  $("rsBtn").addEventListener("click", () => setFirst(true));
+  $("wsBtn").addEventListener("click", () => setFirst(false));
+  $("carry").addEventListener("input", () => {
+    const v = parseInt($("carry").value, 10);
+    if (!isFinite(v) || v < 0) return;
+    state.carryMax = Math.min(v, 50); recompute();
+  });
+  ["optOutline", "optLabels", "optFloats"].forEach((id) => $(id).addEventListener("change", drawChart));
+  $("zoom").addEventListener("input", () => { state.zoom = +$("zoom").value; drawChart(); });
+
+  function setGrid(grid, names) {
+    state.grid = grid;
+    state.names = names || grid.palette.map((_, i) => "Colour " + Core.letter(i));
+    state.sel = null;
+    state.zoom = null;
+    state.ds = new Set(); state.dsFill = -1; state.dsOver = new Map(); closeChooser();
+    J.t = null;
+    setPlaying(false);
+    recompute();
+  }
+  function colourName(i) { return state.names[i] || "Colour " + Core.letter(i); }
+  function strandLabel(id) { return state.analysis.strands[id].name; }
+
+  // ------------------------------------------------------------ yarn estimate
+  const needleSel = $("needle");
+  needleSel.innerHTML = Object.keys(Core.GAUGE).map(Number).sort((x, y) => x - y)
+    .map((n) => `<option value="${n}"${n === 4 ? " selected" : ""}>${n} mm</option>`).join("");
+  function perStitch() {
+    if (state.ownMm > 0) return { lo: state.ownMm * 0.95, hi: state.ownMm * 1.05, own: true };
+    return Core.yarnPerStitch(state.needle);
+  }
+  function yarnFor(st) { return Core.strandYarn(st, perStitch(), state.tailCm * 10); }
+  function fmtLen(mm) {
+    const v = state.units === "yd" ? mm / 914.4 : mm / 1000;
+    return v < 10 ? v.toFixed(1) : String(Math.round(v));
+  }
+  function fmtRange(y) { return `${fmtLen(y.lo)}–${fmtLen(y.hi)} ${state.units}`; }
+  function renderYarnHint() {
+    const p = perStitch();
+    $("perStitchHint").textContent = p.own
+      ? `Using your measurement: ${state.ownMm} mm per stitch (shown as a ±5% range).`
+      : `At ${state.needle} mm, a stitch uses about ${Math.round(p.lo)}–${Math.round(p.hi)} mm of yarn (based on a typical ${p.gauge[0]}–${p.gauge[1]} sts per 10 cm). Your yarn and tension will shift this.`;
+  }
+  function yarnChanged() { renderYarnHint(); renderStats(); renderTab(); renderSel(); }
+  needleSel.addEventListener("change", () => { state.needle = +needleSel.value; yarnChanged(); });
+  $("tail").addEventListener("input", () => { const v = parseFloat($("tail").value); if (isFinite(v) && v >= 0) { state.tailCm = v; yarnChanged(); } });
+  $("ownMm").addEventListener("input", () => { const v = parseFloat($("ownMm").value); state.ownMm = isFinite(v) && v > 0 ? v : null; yarnChanged(); });
+  function setUnits(u) {
+    state.units = u;
+    $("unitM").setAttribute("aria-pressed", u === "m"); $("unitYd").setAttribute("aria-pressed", u === "yd");
+    yarnChanged();
+  }
+  $("unitM").addEventListener("click", () => setUnits("m"));
+  $("unitYd").addEventListener("click", () => setUnits("yd"));
+
+  // ------------------------------------------------------------ duplicate stitch
+  const origStitch = (i) => { const v = state.grid.cells[i]; return v >= 0 && !state.grid.palette[v].none; };
+  function renderDs() {
+    const g = state.grid, n = state.dsInfo ? state.dsInfo.marked.size : 0;
+    const usable = g.palette.map((p, i) => i).filter((i) => !g.palette[i].none);
+    const opts = (sel) => usable.map((i) => `<option value="${i}"${i === sel ? " selected" : ""}>${esc(colourName(i))}</option>`).join("");
+    const keepColour = $("dsColourSel").value === "" ? -1 : +$("dsColourSel").value;
+    $("dsColourSel").innerHTML = opts(usable.includes(keepColour) ? keepColour : usable[usable.length - 1]);
+    $("dsFill").innerHTML = `<option value="-1"${state.dsFill < 0 ? " selected" : ""}>The surrounding colour</option>` + opts(state.dsFill);
+    $("dsCount").textContent = n ? `${fmt(n)} square${n === 1 ? "" : "s"} marked in ${state.dsInfo.patches.length} patch${state.dsInfo.patches.length === 1 ? "" : "es"}` : "No squares marked";
+    $("dsClear").disabled = !n;
+  }
+  function dsChanged() { state.sel = null; recompute(); }
+  function setDsMode(on) {
+    state.dsMode = on;
+    $("dsMode").setAttribute("aria-pressed", on);
+    $("dsMode").textContent = on ? "Done marking" : "Mark squares on the chart";
+    $("dsModeHint").hidden = !on;
+    $("chart").classList.toggle("marking", on);
+    if (on && state.sel != null) select(null);
+  }
+  $("dsMode").addEventListener("click", () => setDsMode(!state.dsMode));
+  $("dsSmall").addEventListener("click", () => {
+    const n = parseInt($("dsSmallN").value, 10), a = state.analysis;
+    if (!(n > 0) || !a) return;
+    const small = new Set(a.strands.filter((st) => st.knit <= n).map((st) => st.id));
+    for (let i = 0; i < a.cellStrand.length; i++) if (small.has(a.cellStrand[i])) state.ds.add(i);
+    dsChanged();
+  });
+  $("dsColour").addEventListener("click", () => {
+    const v = +$("dsColourSel").value, g = state.grid;
+    for (let i = 0; i < g.cells.length; i++) if (g.cells[i] === v) state.ds.add(i);
+    dsChanged();
+  });
+  $("dsFill").addEventListener("change", () => { state.dsFill = +$("dsFill").value; dsChanged(); });
+  $("dsClear").addEventListener("click", () => { state.ds.clear(); state.dsOver.clear(); dsChanged(); });
+  function markStrand(id) {
+    const a = state.analysis;
+    for (let i = 0; i < a.cellStrand.length; i++) if (a.cellStrand[i] === id) state.ds.add(i);
+    dsChanged();
+  }
+  // click-and-drag marking
+  const chartEl = $("chart");
+  let paintVal = null, paintTimer = 0;
+  function paintAt(e) {
+    const hit = cellAt(e);
+    if (!hit) return;
+    const i = hit.r * state.grid.cols + hit.c;
+    if (!origStitch(i)) return;
+    if (paintVal === null) paintVal = !state.ds.has(i);
+    if (paintVal === state.ds.has(i)) return;
+    if (paintVal) state.ds.add(i); else { state.ds.delete(i); state.dsOver.delete(i); }
+    cancelAnimationFrame(paintTimer);
+    paintTimer = requestAnimationFrame(dsChanged);
+  }
+  chartEl.addEventListener("pointerdown", (e) => {
+    if (!state.dsMode) return;
+    e.preventDefault();
+    paintVal = null;
+    try { chartEl.setPointerCapture(e.pointerId); } catch {}
+    paintAt(e);
+  });
+  chartEl.addEventListener("pointermove", (e) => { if (state.dsMode && paintVal !== null) paintAt(e); });
+  const endPaint = () => { paintVal = null; };
+  chartEl.addEventListener("pointerup", endPaint);
+  chartEl.addEventListener("pointercancel", endPaint);
+
+  function recompute() {
+    if (!state.grid) return;
+    state.dsInfo = Core.applyDuplicate(state.grid, state.ds, state.dsFill, state.dsOver);
+    state.dsPatchOf = new Map();
+    state.dsInfo.patches.forEach((pt, k) => pt.cells.forEach((i) => state.dsPatchOf.set(i, k)));
+    state.analysis = Core.analyse(state.dsInfo.grid, { firstRS: state.firstRS, carryMax: state.carryMax });
+    if (state.sel != null && state.sel >= state.analysis.strands.length) state.sel = null;
+    renderLegend(); renderDs(); renderYarnHint(); renderStats(); drawChart(); renderTab(); renderSel();
+  }
+
+  // ------------------------------------------------------------ legend
+  function renderLegend() {
+    const g = state.grid, a = state.analysis;
+    const counts = new Array(g.palette.length).fill(0);
+    for (const v of g.cells) if (v >= 0) counts[v]++;
+    $("legend").innerHTML = g.palette.map((p, i) => `
+      <div class="legend-item${p.none ? " off" : ""}">
+        <span class="swatch" style="background-color:${p.hex}"></span>
+        <span class="letter">${Core.letter(i)}</span>
+        <input type="text" id="cname-${i}" value="${esc(colourName(i))}" aria-label="Name for colour ${Core.letter(i)}">
+        <label class="chk"><input type="checkbox" id="cnone-${i}" ${p.none ? "checked" : ""}> not a stitch</label>
+      </div>`).join("");
+    g.palette.forEach((p, i) => {
+      $("cname-" + i).addEventListener("input", (e) => { state.names[i] = e.target.value; renderTab(); renderSel(); renderDs(); });
+      $("cnone-" + i).addEventListener("change", (e) => { p.none = e.target.checked; recompute(); });
+    });
+  }
+
+  // ------------------------------------------------------------ stats
+  function renderStats() {
+    const a = state.analysis;
+    const knit = a.strands.reduce((s, x) => s + x.knit, 0);
+    const carried = a.strands.reduce((s, x) => s + x.carried, 0);
+    const used = a.colours.filter((c) => c.knit > 0).length;
+    $("stats").innerHTML = [
+      [fmt(a.strands.length), "strands (bobbins) to wind"],
+      [fmt(a.peak.n), `most on the needles at once (row ${a.peak.row})`],
+      [fmt(knit), "stitches knit"],
+      [fmt(carried), "stitches with yarn carried behind"],
+      [fmtRange(a.strands.reduce((t, st) => { const y = yarnFor(st); return { lo: t.lo + y.lo, hi: t.hi + y.hi }; }, { lo: 0, hi: 0 })).replace(" ", "&nbsp;"), "yarn, all bobbins with tails"],
+      ...(state.dsInfo.marked.size ? [[fmt(state.dsInfo.marked.size), "squares to duplicate stitch afterwards"]] : []),
+      [`${a.cols} × ${a.rows}`, `stitches × rows, ${used} colour${used === 1 ? "" : "s"}`],
+    ].map(([b, s]) => `<div class="stat"><b>${b}</b><span>${s}</span></div>`).join("");
+  }
+
+  // ------------------------------------------------------------ chart drawing
+  const cv = $("chart");
+  let layout = null;
+  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  function drawChart() {
+    const a = state.analysis, g = state.grid;
+    if (!a) return;
+    const R = a.rows, C = a.cols;
+    if (state.zoom == null) {
+      const avail = $("chartScroll").clientWidth - 70;
+      state.zoom = Math.max(4, Math.min(28, Math.floor(avail / C)));
+      $("zoom").value = state.zoom;
+    }
+    const s = state.zoom;
+    const mL = 34, mR = 34, mT = 10, mB = 26;
+    const W = mL + C * s + mR, H = mT + R * s + mB;
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+    baseCv.width = cv.width; baseCv.height = cv.height;
+    const ctx = baseCv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    layout = { s, mL, mT, R, C, W, H, dpr };
+    const journey = $("optJourney").checked;
+    const X = (c) => mL + (C - 1 - c) * s; // left edge of column c
+    const Y = (r) => mT + (R - 1 - r) * s; // top edge of row r
+    const ink = cssVar("--ink"), muted = cssVar("--muted");
+    const sel = state.sel;
+    const pal = g.palette;
+
+    ctx.clearRect(0, 0, W, H);
+    // cells
+    for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+      const v = a.cells[r * C + c];
+      if (v < 0) {
+        ctx.fillStyle = cssVar("--sunk"); ctx.fillRect(X(c), Y(r), s, s);
+        ctx.strokeStyle = cssVar("--grid"); ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(X(c), Y(r) + s); ctx.lineTo(X(c) + s, Y(r)); ctx.stroke();
+      } else { ctx.fillStyle = pal[v].hex; ctx.fillRect(X(c), Y(r), s, s); }
+    }
+    // dim everything but the selected strand
+    if (sel != null) {
+      ctx.fillStyle = cssVar("--dim");
+      for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+        const i = r * C + c;
+        if (a.cellStrand[i] !== sel) ctx.fillRect(X(c), Y(r), s, s);
+      }
+    }
+    // in journey mode, wash the chart back so the yarn paths stand out
+    if (journey) {
+      ctx.fillStyle = cssVar("--wash");
+      ctx.fillRect(mL, mT, C * s, R * s);
+    }
+    // grid lines
+    if (s >= 6) {
+      ctx.lineWidth = 1;
+      for (let c = 0; c <= C; c++) {
+        ctx.strokeStyle = c % 10 === 0 ? cssVar("--grid-strong") : cssVar("--grid");
+        const x = mL + (C - c) * s + 0.5;
+        ctx.beginPath(); ctx.moveTo(x, mT); ctx.lineTo(x, mT + R * s); ctx.stroke();
+      }
+      for (let r = 0; r <= R; r++) {
+        ctx.strokeStyle = r % 10 === 0 ? cssVar("--grid-strong") : cssVar("--grid");
+        const y = mT + (R - r) * s + 0.5;
+        ctx.beginPath(); ctx.moveTo(mL, y); ctx.lineTo(mL + C * s, y); ctx.stroke();
+      }
+    }
+    // strand outlines
+    if ($("optOutline").checked) {
+      if (journey) ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = cssVar("--outline");
+      ctx.lineWidth = Math.max(1.5, s / 9);
+      ctx.lineCap = "square";
+      ctx.beginPath();
+      const id = (r, c) => (r < 0 || r >= R || c < 0 || c >= C ? -2 : a.cellStrand[r * C + c]);
+      for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+        const k = id(r, c);
+        if (k < 0) continue;
+        const x = X(c), y = Y(r);
+        if (id(r + 1, c) !== k) { ctx.moveTo(x, y); ctx.lineTo(x + s, y); }
+        if (id(r - 1, c) !== k) { ctx.moveTo(x, y + s); ctx.lineTo(x + s, y + s); }
+        if (id(r, c + 1) !== k) { ctx.moveTo(x, y); ctx.lineTo(x, y + s); }
+        if (id(r, c - 1) !== k) { ctx.moveTo(x + s, y); ctx.lineTo(x + s, y + s); }
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    // duplicate-stitch marks: a V in the colour to embroider
+    if (state.dsInfo && state.dsInfo.marked.size && s >= 5) {
+      const t = Math.max(1.5, s * 0.15);
+      ctx.lineCap = "round"; ctx.lineJoin = "round";
+      for (const i of state.dsInfo.marked) {
+        const r = Math.floor(i / C), c = i % C, x = X(c), y = Y(r);
+        if (sel != null && a.cellStrand[i] !== sel) continue;
+        ctx.beginPath();
+        ctx.moveTo(x + s * 0.2, y + s * 0.24); ctx.lineTo(x + s * 0.5, y + s * 0.78); ctx.lineTo(x + s * 0.8, y + s * 0.24);
+        ctx.strokeStyle = cssVar("--outline"); ctx.lineWidth = t + 2; ctx.stroke();
+        ctx.strokeStyle = pal[g.cells[i]].hex; ctx.lineWidth = t; ctx.stroke();
+        if (!state.dsOver.has(i) && state.dsFill < 0 && Core.duplicateOptions(state.dsInfo, g, i).length > 1) {
+          const f = Math.max(4, s * 0.32);
+          ctx.beginPath(); ctx.moveTo(x + s - f, y); ctx.lineTo(x + s, y); ctx.lineTo(x + s, y + f); ctx.closePath();
+          ctx.fillStyle = "#fff"; ctx.fill(); ctx.strokeStyle = cssVar("--outline"); ctx.lineWidth = 1; ctx.stroke();
+        }
+      }
+    }
+    // carried yarn
+    if ($("optFloats").checked && !journey) {
+      for (const ro of a.rowsOut) {
+        const r = ro.row - 1;
+        for (const u of ro.usages) {
+          if (sel != null && u.strand !== sel) continue;
+          for (const run of u.carryRuns) {
+            const x0 = X(run.c1) - s * 0.35, x1 = X(run.c0) + s * 1.35, y = Y(r) + s * 0.5;
+            const th = Math.max(2, s * 0.22);
+            ctx.lineCap = "round";
+            ctx.strokeStyle = cssVar("--outline"); ctx.lineWidth = th + 2;
+            ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+            ctx.strokeStyle = pal[u.colour].hex; ctx.lineWidth = th;
+            ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+          }
+        }
+      }
+    }
+    // strand names at each strand's first stitch
+    if ($("optLabels").checked && s >= 12 && !journey) {
+      const fs = Math.min(13, Math.max(9, s * 0.48));
+      ctx.font = `600 ${fs}px "JetBrains Mono", monospace`;
+      ctx.textBaseline = "middle";
+      for (const st of a.strands) {
+        if (sel != null && st.id !== sel) continue;
+        const { r, c } = st.firstCell;
+        const text = st.name;
+        const tw = ctx.measureText(text).width + 6, th = fs + 4;
+        let x = X(c) + s / 2 - tw / 2;
+        x = Math.max(mL, Math.min(x, mL + C * s - tw));
+        const y = Y(r) + s / 2 - th / 2;
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.strokeStyle = "rgba(0,0,0,0.75)"; ctx.lineWidth = 1;
+        roundRect(ctx, x, y, tw, th, 3); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#111";
+        ctx.textAlign = "center";
+        ctx.fillText(text, x + tw / 2, y + th / 2 + 0.5);
+      }
+    }
+    // row and column numbers
+    ctx.fillStyle = muted;
+    ctx.font = `${Math.min(12, Math.max(9, s * 0.55))}px "JetBrains Mono", monospace`;
+    ctx.textBaseline = "middle";
+    const every = s >= 11 ? 1 : s >= 7 ? 5 : 10;
+    for (const ro of a.rowsOut) {
+      const r = ro.row - 1;
+      if (ro.row % every !== 0 && ro.row !== 1) continue;
+      const y = Y(r) + s / 2;
+      ctx.fillStyle = ro.side === "RS" ? ink : muted;
+      if (ro.rtl) { ctx.textAlign = "left"; ctx.fillText(ro.row, mL + C * s + 6, y); }
+      else { ctx.textAlign = "right"; ctx.fillText(ro.row, mL - 6, y); }
+    }
+    ctx.fillStyle = muted; ctx.textAlign = "center"; ctx.textBaseline = "top";
+    const ce = s >= 14 ? 1 : 5;
+    for (let c = 0; c < C; c++) if ((c + 1) % ce === 0 || c === 0) ctx.fillText(c + 1, X(c) + s / 2, mT + R * s + 6);
+
+    // journey clock: one tick per stitch, row by row in knitting order
+    const total = R * C;
+    const scrub = $("jScrub");
+    scrub.max = total;
+    if (J.t == null || J.t > total) J.t = total;
+    scrub.value = Math.floor(J.t);
+    paint();
+  }
+
+  // ------------------------------------------------------------ yarn journeys
+  const baseCv = document.createElement("canvas");
+  const J = { t: null, playing: false, last: 0, raf: 0 };
+
+  function paint() {
+    if (!layout) return;
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(baseCv, 0, 0);
+    if ($("optJourney").checked) {
+      ctx.setTransform(layout.dpr, 0, 0, layout.dpr, 0, 0);
+      drawJourneys(ctx, J.t);
+    }
+    updatePos();
+  }
+
+  function updatePos() {
+    const a = state.analysis;
+    if (!a || !$("optJourney").checked) return;
+    const C = a.cols, t = Math.floor(J.t);
+    let txt;
+    if (t <= 0) txt = "Ready to cast on";
+    else if (t >= a.rows * C) txt = `All ${a.rows} rows knitted`;
+    else {
+      const r = Math.floor((t - 1) / C), st = ((t - 1) % C) + 1;
+      txt = `Row ${r + 1} (${a.rowsOut[r].side}), stitch ${st} of ${C}`;
+    }
+    $("jPos").textContent = txt;
+  }
+
+  function smoothPath(ctx, pts) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    if (pts.length === 1) { ctx.lineTo(pts[0].x + 0.01, pts[0].y); return; }
+    for (let i = 1; i < pts.length - 1; i++) {
+      const mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2;
+      ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+    }
+    const l = pts[pts.length - 1];
+    ctx.lineTo(l.x, l.y);
+  }
+
+  // A cat's head, always upright, looking the way its yarn is travelling.
+  function drawCatHead(ctx, x, y, r, colour, outline, dx, dy, detail) {
+    const lum = Core.luminance(Core.hexToRgb(colour));
+    const line = lum < 0.35 ? "rgba(255,255,255,0.85)" : "#1b1b1b";
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    // ears
+    for (const sx of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(sx * r * 0.92, -r * 0.2);
+      ctx.lineTo(sx * r * 0.78, -r * 1.25);
+      ctx.lineTo(sx * r * 0.18, -r * 0.78);
+      ctx.closePath();
+      ctx.fillStyle = colour; ctx.fill();
+      ctx.strokeStyle = outline; ctx.lineWidth = 1.5; ctx.stroke();
+      if (detail) {
+        ctx.beginPath();
+        ctx.moveTo(sx * r * 0.74, -r * 0.42);
+        ctx.lineTo(sx * r * 0.7, -r * 1.0);
+        ctx.lineTo(sx * r * 0.36, -r * 0.74);
+        ctx.closePath();
+        ctx.fillStyle = "#f2a7b5"; ctx.fill();
+      }
+    }
+    // face
+    ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.86, 0, 0, Math.PI * 2);
+    ctx.fillStyle = colour; ctx.fill();
+    ctx.strokeStyle = outline; ctx.lineWidth = 1.5; ctx.stroke();
+    if (detail) {
+      // eyes, glancing where the yarn is heading
+      const len = Math.hypot(dx, dy) || 1, lx = (dx / len) * r * 0.09, ly = (dy / len) * r * 0.09;
+      for (const sx of [-1, 1]) {
+        ctx.beginPath(); ctx.ellipse(sx * r * 0.38, -r * 0.12, r * 0.22, r * 0.26, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "#fffbe6"; ctx.fill(); ctx.strokeStyle = outline; ctx.lineWidth = 1; ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(sx * r * 0.38 + lx, -r * 0.12 + ly, r * 0.08, r * 0.18, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "#111"; ctx.fill();
+      }
+      // nose and mouth
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.11, r * 0.2); ctx.lineTo(r * 0.11, r * 0.2); ctx.lineTo(0, r * 0.33); ctx.closePath();
+      ctx.fillStyle = "#e7849a"; ctx.fill();
+      ctx.strokeStyle = line; ctx.lineWidth = Math.max(0.8, r * 0.07);
+      ctx.beginPath();
+      ctx.moveTo(0, r * 0.33); ctx.quadraticCurveTo(-r * 0.04, r * 0.48, -r * 0.2, r * 0.44);
+      ctx.moveTo(0, r * 0.33); ctx.quadraticCurveTo(r * 0.04, r * 0.48, r * 0.2, r * 0.44);
+      ctx.stroke();
+      // whiskers
+      ctx.lineWidth = Math.max(0.6, r * 0.05);
+      ctx.beginPath();
+      for (const sx of [-1, 1]) for (const k of [-1, 0, 1]) {
+        ctx.moveTo(sx * r * 0.32, r * 0.3 + k * r * 0.05);
+        ctx.lineTo(sx * r * 1.3, r * 0.22 + k * r * 0.2);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawJourneys(ctx, T) {
+    const a = state.analysis, pal = state.grid.palette;
+    const { s, mL, mT, R, C } = layout;
+    const cx = (c) => mL + (C - 1 - c) * s + s / 2;
+    const cy = (r) => mT + (R - 1 - r) * s + s / 2;
+    const w = Math.max(3, s * 0.44);
+    const outline = cssVar("--outline");
+    const heads = [];
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (const st of a.strands) {
+      if (state.sel != null && st.id !== state.sel) continue;
+      let n = 0;
+      while (n < st.path.length && st.path[n].t < T) n++;
+      if (!n) continue;
+      const pts = st.path.slice(0, n).map((q) => ({ x: cx(q.c), y: cy(q.r), carried: q.carried }));
+      const colour = pal[st.colour].hex;
+      // split into knit and carried stretches (sharing their end points so the yarn stays joined)
+      const runs = [];
+      let cur = null;
+      pts.forEach((p, i) => {
+        if (!cur || cur.carried !== p.carried) {
+          cur = { carried: p.carried, pts: i > 0 ? [pts[i - 1]] : [] };
+          runs.push(cur);
+        }
+        cur.pts.push(p);
+      });
+      // carried yarn: thinner, dashed, sitting behind
+      for (const run of runs.filter((x) => x.carried)) {
+        ctx.setLineDash([Math.max(2, s * 0.25), Math.max(2, s * 0.18)]);
+        smoothPath(ctx, run.pts); ctx.strokeStyle = outline; ctx.lineWidth = w * 0.45 + 2; ctx.stroke();
+        smoothPath(ctx, run.pts); ctx.strokeStyle = colour; ctx.lineWidth = w * 0.45; ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      // knitted yarn: a rounded tube
+      for (const run of runs.filter((x) => !x.carried)) {
+        smoothPath(ctx, run.pts); ctx.strokeStyle = outline; ctx.lineWidth = w + 2.5; ctx.stroke();
+        smoothPath(ctx, run.pts); ctx.strokeStyle = colour; ctx.lineWidth = w; ctx.stroke();
+        if (w >= 5) { smoothPath(ctx, run.pts); ctx.strokeStyle = "rgba(255,255,255,0.28)"; ctx.lineWidth = w * 0.3; ctx.stroke(); }
+      }
+      // tail
+      const t0 = pts[0];
+      ctx.fillStyle = outline;
+      ctx.beginPath(); ctx.arc(t0.x, t0.y, w * 0.22, 0, Math.PI * 2); ctx.fill();
+      const head = pts[pts.length - 1], prev = pts.length > 1 ? pts[pts.length - 2] : { x: head.x - 1, y: head.y };
+      heads.push({ st, head, ang: Math.atan2(head.y - prev.y, head.x - prev.x), colour });
+    }
+    // heads on top of every body
+    for (const { st, head, ang, colour } of heads) {
+      const hr = Math.max(4, w * 0.95);
+      drawCatHead(ctx, head.x, head.y, hr, colour, outline, Math.cos(ang), Math.sin(ang), s >= 9);
+      if ($("optLabels").checked && s >= 12) {
+        const fs = Math.min(13, Math.max(9, s * 0.48));
+        ctx.font = `600 ${fs}px "JetBrains Mono", monospace`;
+        ctx.textBaseline = "middle"; ctx.textAlign = "center";
+        const tw = ctx.measureText(st.name).width + 6, th = fs + 4;
+        const hr = Math.max(4, w * 0.95);
+        let x = head.x - tw / 2, y = head.y - hr * 1.75 - th;
+        x = Math.max(mL, Math.min(x, mL + C * s - tw));
+        if (y < mT) y = head.y + hr * 1.15;
+        ctx.fillStyle = "rgba(255,255,255,0.94)"; ctx.strokeStyle = "rgba(0,0,0,0.75)"; ctx.lineWidth = 1;
+        roundRect(ctx, x, y, tw, th, 3); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#111"; ctx.fillText(st.name, x + tw / 2, y + th / 2 + 0.5);
+      }
+    }
+  }
+
+  function setPlaying(on) {
+    J.playing = on;
+    $("jPlay").textContent = on ? "Pause" : "Play";
+    cancelAnimationFrame(J.raf);
+    if (on) { J.last = performance.now(); J.raf = requestAnimationFrame(tick); }
+  }
+  function tick(now) {
+    const a = state.analysis;
+    if (!J.playing || !a) return;
+    const dt = Math.min(0.1, (now - J.last) / 1000);
+    J.last = now;
+    const total = a.rows * a.cols;
+    J.t = Math.min(total, J.t + dt * +$("jSpeed").value * a.cols);
+    $("jScrub").value = Math.floor(J.t);
+    paint();
+    if (J.t >= total) { setPlaying(false); return; }
+    J.raf = requestAnimationFrame(tick);
+  }
+  $("jPlay").addEventListener("click", () => {
+    const a = state.analysis;
+    if (!a) return;
+    if (!J.playing && J.t >= a.rows * a.cols) J.t = 0;
+    setPlaying(!J.playing);
+  });
+  $("jScrub").addEventListener("input", () => { setPlaying(false); J.t = +$("jScrub").value; paint(); });
+  $("optJourney").addEventListener("change", () => {
+    $("journeybar").hidden = !$("optJourney").checked;
+    if (!$("optJourney").checked) setPlaying(false);
+    drawChart();
+  });
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function cellAt(e) {
+    if (!layout) return null;
+    const rect = cv.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const { s, mL, mT, R, C } = layout;
+    const ci = Math.floor((px - mL) / s), rj = Math.floor((py - mT) / s);
+    if (ci < 0 || ci >= C || rj < 0 || rj >= R) return null;
+    return { r: R - 1 - rj, c: C - 1 - ci, px, py };
+  }
+  function carriedAt(r, c) {
+    const ro = state.analysis.rowsOut[r];
+    return ro.usages.filter((u) => u.carryRuns.some((run) => c >= run.c0 && c <= run.c1)).map((u) => u.strand);
+  }
+  cv.addEventListener("mousemove", (e) => {
+    const hit = cellAt(e), tip = $("tip");
+    if (!hit) { tip.hidden = true; return; }
+    const a = state.analysis, i = hit.r * a.cols + hit.c, v = a.cells[i];
+    const ro = a.rowsOut[hit.r];
+    let html = `Row ${hit.r + 1} (${ro.side}) · stitch ${hit.c + 1}<br>`;
+    if (v < 0) html += "Not a stitch";
+    else html += `${esc(colourName(v))} · strand <b>${strandLabel(a.cellStrand[i])}</b>`;
+    if (state.ds.has(i) && state.dsInfo.marked.has(i)) html += `<br>Duplicate stitch later in ${esc(colourName(state.grid.cells[i]))}`;
+    const car = carriedAt(hit.r, hit.c);
+    if (car.length) html += `<br>Carried behind: ${car.map(strandLabel).join(", ")}`;
+    tip.innerHTML = html; tip.hidden = false;
+    const sc = $("chartScroll");
+    const cr = cv.getBoundingClientRect(), sr = sc.getBoundingClientRect();
+    let left = cr.left - sr.left + sc.scrollLeft + hit.px + 14, top = cr.top - sr.top + sc.scrollTop + hit.py + 14;
+    const maxLeft = sc.scrollLeft + sc.clientWidth - tip.offsetWidth - 6;
+    if (left > maxLeft) left = Math.max(sc.scrollLeft + 4, left - tip.offsetWidth - 28);
+    tip.style.left = left + "px"; tip.style.top = top + "px";
+  });
+  cv.addEventListener("mouseleave", () => ($("tip").hidden = true));
+  cv.addEventListener("click", (e) => {
+    if (state.dsMode) return;
+    const hit = cellAt(e);
+    if (!hit) return;
+    const idx = hit.r * state.analysis.cols + hit.c;
+    if (state.dsInfo.marked.has(idx)) { openChooser(idx, hit); return; }
+    closeChooser();
+    const a = state.analysis, k = a.cellStrand[hit.r * a.cols + hit.c];
+    select(k < 0 || k === state.sel ? null : k);
+  });
+
+  // ------------------------------------------------------------ choosing what to knit under a duplicate stitch
+  let chooserCell = null;
+  function previewWith(over) {
+    const res = Core.applyDuplicate(state.grid, state.ds, state.dsFill, over);
+    const an = Core.analyse(res.grid, { firstRS: state.firstRS, carryMax: state.carryMax });
+    const per = perStitch(), tail = state.tailCm * 10;
+    const y = an.strands.reduce((t, st) => { const v = Core.strandYarn(st, per, tail); return { lo: t.lo + v.lo, hi: t.hi + v.hi }; }, { lo: 0, hi: 0 });
+    return { strands: an.strands.length, peak: an.peak.n, y };
+  }
+  function patchCells(i) {
+    const k = state.dsPatchOf.get(i);
+    return k == null ? [i] : state.dsInfo.patches[k].cells;
+  }
+  function openChooser(i, hit) {
+    chooserCell = i;
+    const g = state.grid, C = g.cols, r = Math.floor(i / C), c = i % C;
+    const cells = patchCells(i);
+    const whole = cells.length > 1 && state.chooseWhole;
+    const targets = whole ? cells : [i];
+    const optSet = new Set();
+    for (const j of targets) Core.duplicateOptions(state.dsInfo, g, j).forEach((v) => optSet.add(v));
+    const opts = [...optSet];
+    const current = state.dsInfo.grid.cells[i];
+    const isAuto = !targets.some((j) => state.dsOver.has(j));
+    const line = (label, swatch, pv, pressed, val) => `<button type="button" class="opt" data-choose="${val}" aria-pressed="${pressed}">
+        ${swatch}<span>${label}</span><small>${pv.strands} strands · ${fmtRange(pv.y)}</small></button>`;
+    const withChoice = (v) => { const m = new Map(state.dsOver); targets.forEach((j) => (v < 0 ? m.delete(j) : m.set(j, v))); return m; };
+    const ch = $("chooser");
+    ch.innerHTML = `<h4>Row ${r + 1}, stitch ${c + 1}</h4>
+      <div class="hint">Duplicate stitch later in ${esc(colourName(g.cells[i]))}. Knit ${whole ? `these ${cells.length} squares` : "this square"} in:</div>
+      <div class="opts">
+        ${opts.map((v) => line(esc(colourName(v)), `<span class="swatch" style="background-color:${g.palette[v].hex}"></span>`, previewWith(withChoice(v)), !isAuto && targets.every((j) => state.dsInfo.grid.cells[j] === v), v)).join("")}
+        ${(() => { const m = withChoice(-1), autoCol = Core.applyDuplicate(state.grid, state.ds, state.dsFill, m).grid.cells[i];
+          return line(`${state.dsFill >= 0 ? "Panel setting" : "Auto"} (${esc(colourName(autoCol))})`, `<span class="swatch" style="background-color:${g.palette[autoCol].hex};opacity:.55"></span>`, previewWith(m), isAuto, -1); })()}
+      </div>
+      ${cells.length > 1 ? `<label class="chk"><input type="checkbox" id="chooseWhole" ${whole ? "checked" : ""}> Apply to the whole patch (${cells.length} squares)</label>` : ""}
+      <div class="links">
+        <button type="button" id="chFollow">Follow its strand</button>
+        <button type="button" id="chUnmark">Knit it instead</button>
+        <button type="button" id="chClose">Close</button>
+      </div>`;
+    ch.hidden = false;
+    ch.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", () => {
+      const v = +b.dataset.choose;
+      targets.forEach((j) => (v < 0 ? state.dsOver.delete(j) : state.dsOver.set(j, v)));
+      closeChooser(); dsChanged();
+    }));
+    const wh = $("chooseWhole");
+    if (wh) wh.addEventListener("change", () => { state.chooseWhole = wh.checked; openChooser(i, hit); });
+    $("chFollow").addEventListener("click", () => { const k = state.analysis.cellStrand[i]; closeChooser(); if (k >= 0) select(k); });
+    $("chUnmark").addEventListener("click", () => { targets.forEach((j) => { state.ds.delete(j); state.dsOver.delete(j); }); closeChooser(); dsChanged(); });
+    $("chClose").addEventListener("click", closeChooser);
+    // position next to the square, inside the scroll area
+    const card = ch.parentElement.getBoundingClientRect(), cr = cv.getBoundingClientRect();
+    let left = cr.left - card.left + hit.px + 16, top = cr.top - card.top + hit.py + 12;
+    const maxLeft = card.width - ch.offsetWidth - 8;
+    if (left > maxLeft) left = Math.max(8, left - ch.offsetWidth - 32);
+    ch.style.left = left + "px"; ch.style.top = top + "px";
+    $("tip").hidden = true;
+    ch.querySelector("[data-choose]").focus();
+  }
+  $("chartScroll").addEventListener("scroll", () => { if (chooserCell != null) closeChooser(); });
+  function closeChooser() { chooserCell = null; const ch = $("chooser"); if (ch) ch.hidden = true; }
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && chooserCell != null) closeChooser(); });
+  document.addEventListener("pointerdown", (e) => {
+    if (chooserCell == null) return;
+    if (!$("chooser").contains(e.target) && e.target !== cv) closeChooser();
+  });
+
+  function select(id) {
+    state.sel = id;
+    drawChart(); renderSel(); renderTab();
+  }
+  function renderSel() {
+    const bar = $("selbar"), a = state.analysis;
+    if (state.sel == null || !a) { bar.hidden = true; return; }
+    const st = a.strands[state.sel];
+    bar.hidden = false;
+    bar.innerHTML = `<span><b>${st.name}</b> · ${esc(colourName(st.colour))}</span>
+      <span>rows ${st.startRow}–${st.endRow} (${st.rowsUsed} row${st.rowsUsed === 1 ? "" : "s"})</span>
+      <span>${fmt(st.knit)} sts knit</span><span>${fmt(st.carried)} carried</span><span>wind ${fmtRange(yarnFor(st))}</span>
+      <span class="grow"></span><button type="button" id="dsSelStrand">Duplicate stitch this instead</button><button type="button" id="clearSel">Show all strands</button>`;
+    $("clearSel").addEventListener("click", () => select(null));
+    $("dsSelStrand").addEventListener("click", () => markStrand(st.id));
+  }
+
+  // ------------------------------------------------------------ tables
+  const tabs = ["colours", "strands", "blocks", "rows", "ds"];
+  tabs.forEach((t) => $("tab-" + t).addEventListener("click", () => { state.tab = t; tabs.forEach((x) => $("tab-" + x).setAttribute("aria-selected", x === t)); renderTab(); }));
+  const sw = (i) => `<span class="cname"><span class="swatch" style="background-color:${state.grid.palette[i].hex}"></span>${esc(colourName(i))}</span>`;
+  let copyRows = [];
+  function autoColourOf(pt) {
+    const m = new Map(state.dsOver);
+    pt.cells.forEach((j) => m.delete(j));
+    return Core.applyDuplicate(state.grid, state.ds, state.dsFill, m).grid.cells[pt.cells[0]];
+  }
+  function patchSelect(pt, k) {
+    const g = state.grid, optSet = new Set();
+    pt.cells.forEach((j) => Core.duplicateOptions(state.dsInfo, g, j).forEach((v) => optSet.add(v)));
+    const chosen = pt.cells.map((j) => (state.dsOver.has(j) ? state.dsOver.get(j) : -1));
+    const same = chosen.every((v) => v === chosen[0]);
+    const val = same ? chosen[0] : "mixed";
+    if (val !== "mixed" && val >= 0) optSet.add(val);
+    return `<select data-patch-fill="${k}" aria-label="Knit patch ${k + 1} in">
+      <option value="-1"${val === -1 ? " selected" : ""}>${state.dsFill >= 0 ? "Panel setting" : "Auto"} (${esc(colourName(autoColourOf(pt)))})</option>
+      ${val === "mixed" ? `<option value="mixed" selected>Mixed, set per square</option>` : ""}
+      ${[...optSet].map((v) => `<option value="${v}"${val === v ? " selected" : ""}>${esc(colourName(v))}</option>`).join("")}
+    </select>`;
+  }
+
+  function renderTab() {
+    const a = state.analysis;
+    if (!a) return;
+    const p = $("panel");
+    $("copyBtn").textContent = "Copy table";
+    if (state.tab === "colours") {
+      const rows = a.colours.filter((c) => c.knit > 0);
+      const cy = {};
+      for (const st of a.strands) { const y = yarnFor(st); const t = (cy[st.colour] = cy[st.colour] || { lo: 0, hi: 0 }); t.lo += y.lo; t.hi += y.hi; }
+      const ty = Object.values(cy).reduce((t, y) => ({ lo: t.lo + y.lo, hi: t.hi + y.hi }), { lo: 0, hi: 0 });
+      const zero = { lo: 0, hi: 0 };
+      const tot = rows.reduce((t, c) => ({ strands: t.strands + c.strands, knit: t.knit + c.knit, carried: t.carried + c.carried, blocks: t.blocks + c.blocks }), { strands: 0, knit: 0, carried: 0, blocks: 0 });
+      const u = state.units;
+      copyRows = [["Colour", "Strands", "Most at once", "Stitches knit", "Stitches carried", "Colour areas", `Yarn min (${u})`, `Yarn max (${u})`],
+        ...rows.map((c) => [colourName(c.index), c.strands, c.maxAtOnce, c.knit, c.carried, c.blocks, fmtLen((cy[c.index] || zero).lo), fmtLen((cy[c.index] || zero).hi)]),
+        ["Total", tot.strands, a.peak.n, tot.knit, tot.carried, tot.blocks, fmtLen(ty.lo), fmtLen(ty.hi)]];
+      p.innerHTML = `<div class="tablewrap"><table><thead><tr><th>Colour</th><th class="num">Strands</th><th class="num">Most at once</th><th class="num">Stitches knit</th><th class="num">Stitches carried</th><th class="num">Colour areas</th><th class="num">Yarn</th></tr></thead><tbody>
+        ${rows.map((c) => `<tr><td>${sw(c.index)}</td><td class="num">${c.strands}</td><td class="num">${c.maxAtOnce} <span class="hint">row ${c.maxAtOnceRow}</span></td><td class="num">${fmt(c.knit)}</td><td class="num">${fmt(c.carried)}</td><td class="num">${c.blocks}</td><td class="num range">${fmtRange(cy[c.index] || zero)}</td></tr>`).join("")}
+        </tbody><tfoot><tr><td>All colours</td><td class="num">${tot.strands}</td><td class="num">${a.peak.n} <span class="hint">row ${a.peak.row}</span></td><td class="num">${fmt(tot.knit)}</td><td class="num">${fmt(tot.carried)}</td><td class="num">${tot.blocks}</td><td class="num range">${fmtRange(ty)}</td></tr></tfoot></table></div>
+        <p class="hint" style="padding:8px 14px 0">"Most at once" is how many bobbins of that colour hang from the work in its busiest row.</p>`;
+    } else if (state.tab === "strands") {
+      const list = [...a.strands].sort((x, y) => x.colour - y.colour || x.n - y.n);
+      const u = state.units;
+      copyRows = [["Strand", "Colour", "First row", "Last row", "Rows knit", "Stitches knit", "Stitches carried", "Rows with carrying", "Stitch equivalents", `Yarn min (${u})`, `Yarn max (${u})`],
+        ...list.map((s) => { const y = yarnFor(s); return [s.name, colourName(s.colour), s.startRow, s.endRow, s.rowsUsed, s.knit, s.carried, s.carryRows, y.equiv, fmtLen(y.lo), fmtLen(y.hi)]; })];
+      p.innerHTML = `<div class="tablewrap"><table><thead><tr><th>Strand</th><th>Colour</th><th class="num">Rows</th><th class="num">Rows knit</th><th class="num">Stitches knit</th><th class="num">Carried</th><th class="num">Rows with carrying</th><th class="num">Yarn to wind</th></tr></thead><tbody>
+        ${list.map((s) => `<tr class="clickable${s.id === state.sel ? " sel" : ""}" data-strand="${s.id}" tabindex="0"><td class="mono"><b>${s.name}</b>${s.knit <= 4 ? `<button type="button" class="tag" data-ds-strand="${s.id}" title="Mark this strand's stitches for duplicate stitch">few sts: duplicate stitch?</button>` : ""}</td><td>${sw(s.colour)}</td><td class="num">${s.startRow}–${s.endRow}</td><td class="num">${s.rowsUsed}</td><td class="num">${fmt(s.knit)}</td><td class="num">${fmt(s.carried)}</td><td class="num">${s.carryRows}</td><td class="num range">${fmtRange(yarnFor(s))}</td></tr>`).join("")}
+        </tbody></table></div>
+        <p class="hint" style="padding:8px 14px 0">Yarn to wind = (stitches knit + 1 per row + ½ per carried stitch) × yarn per stitch, plus a ${state.tailCm} cm tail at each end. Wind a little extra if you're unsure.</p>`;
+    } else if (state.tab === "blocks") {
+      copyRows = [["Area", "Colour", "From row", "To row", "Rows tall", "Stitches", "Strands used"],
+        ...a.blocks.map((b) => [Core.letter(b.colour) + "-" + b.n, colourName(b.colour), b.rowLo, b.rowHi, b.rowsSpanned, b.stitches, b.strands.map(strandLabel).join(" ")])];
+      p.innerHTML = `<div class="tablewrap"><table><thead><tr><th>Area</th><th>Colour</th><th class="num">Rows</th><th class="num">Rows tall</th><th class="num">Stitches</th><th>Strands used</th></tr></thead><tbody>
+        ${a.blocks.map((b) => `<tr><td class="mono">${Core.letter(b.colour)}-${b.n}</td><td>${sw(b.colour)}</td><td class="num">${b.rowLo}–${b.rowHi}</td><td class="num">${b.rowsSpanned}</td><td class="num">${fmt(b.stitches)}</td><td>${b.strands.map((k) => `<button type="button" class="chip${k === state.sel ? " sel" : ""}" data-strand="${k}">${strandLabel(k)}</button>`).join(" ")}</td></tr>`).join("")}
+        </tbody></table></div>
+        <p class="hint" style="padding:8px 14px 0">A colour area is a patch of one colour joined edge to edge. One area can need several strands, and one strand can carry across into another area.</p>`;
+    } else if (state.tab === "ds") {
+      const info = state.dsInfo, per = perStitch(), tail = state.tailCm * 10, u = state.units;
+      if (!info.marked.size) {
+        copyRows = [];
+        p.innerHTML = `<p class="empty">No squares are marked for duplicate stitch. Use "Mark squares on the chart" in the left panel, mark all the small strands at once, or pick a whole colour. The chart, strands and yarn amounts then show what you'll actually knit.</p>`;
+      } else {
+        const byColour = new Map();
+        info.patches.forEach((pt) => { const t = byColour.get(pt.colour) || { n: 0, patches: 0 }; t.n += pt.cells.length; t.patches++; byColour.set(pt.colour, t); });
+        const C = a.cols;
+        const rowsOf = (pt) => { const rs = pt.cells.map((i) => Math.floor(i / C) + 1); return [Math.min(...rs), Math.max(...rs)]; };
+        copyRows = [["Patch", "Colour", "From row", "To row", "Squares", `Yarn min (${u})`, `Yarn max (${u})`],
+          ...info.patches.map((pt, k) => { const [lo, hi] = rowsOf(pt), y = Core.duplicateYarn(pt.cells.length, 1, per, tail); return [k + 1, colourName(pt.colour), lo, hi, pt.cells.length, fmtLen(y.lo), fmtLen(y.hi)]; })];
+        p.innerHTML = `<div class="tablewrap"><table><thead><tr><th>Colour</th><th class="num">Squares</th><th class="num">Patches</th><th class="num">Yarn for embroidery</th></tr></thead><tbody>
+          ${[...byColour].map(([v, t]) => `<tr><td>${sw(v)}</td><td class="num">${fmt(t.n)}</td><td class="num">${t.patches}</td><td class="num range">${fmtRange(Core.duplicateYarn(t.n, t.patches, per, tail))}</td></tr>`).join("")}
+          </tbody></table></div>
+          <div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>Patch</th><th>Colour</th><th class="num">Rows</th><th class="num">Squares</th><th class="num">Yarn</th><th>Knit in</th><th></th></tr></thead><tbody>
+          ${info.patches.map((pt, k) => { const [lo, hi] = rowsOf(pt); return `<tr><td class="mono">${k + 1}</td><td>${sw(pt.colour)}</td><td class="num">${lo === hi ? lo : lo + "–" + hi}</td><td class="num">${pt.cells.length}</td><td class="num range">${fmtRange(Core.duplicateYarn(pt.cells.length, 1, per, tail))}</td><td>${patchSelect(pt, k)}</td><td><button type="button" data-ds-patch="${k}">Knit it instead</button></td></tr>`; }).join("")}
+          </tbody></table></div>
+          <p class="hint" style="padding:8px 14px 0">Duplicate stitch traces over each knitted stitch, so it's estimated at 1.6–2.2 times a knitted stitch's yarn, plus a ${state.tailCm} cm tail at each end of every patch. The strand and yarn figures in the other tabs already leave these squares out. To choose what's knitted under a single square, click it on the chart.</p>`;
+      }
+    } else {
+      copyRows = [["Row", "Side", "Direction", "Sequence", "New strands", "Strands cut after"]];
+      const dsByRow = new Map();
+      for (const i of state.dsInfo.marked) {
+        const r = Math.floor(i / a.cols), v = state.grid.cells[i];
+        if (!dsByRow.has(r)) dsByRow.set(r, new Map());
+        const m = dsByRow.get(r); m.set(v, (m.get(v) || 0) + 1);
+      }
+      const cutAfter = new Map();
+      a.rowsOut.forEach((ro, i) => {
+        if (i > 0) cutAfter.set(i - 1, ro.ended);
+        if (ro.endedAfter) cutAfter.set(i, ro.endedAfter);
+      });
+      p.innerHTML = `<div class="rows">${a.rowsOut.map((ro, i) => {
+        const seq = ro.items.map((it) => `${it.floatBefore ? `<span class="float" title="yarn carried behind">↷${it.floatBefore}</span>` : ""}<button type="button" class="chip${it.strand === state.sel ? " sel" : ""}" data-strand="${it.strand}"><span class="swatch" style="background-color:${state.grid.palette[it.colour].hex}"></span>${strandLabel(it.strand)} ×${it.n}</button>`).join("");
+        const cut = cutAfter.get(i) || [];
+        const notes = [];
+        if (ro.started.length) notes.push("new: " + ro.started.map(strandLabel).join(", "));
+        const dsRow = dsByRow.get(i);
+        if (dsRow) notes.push("duplicate stitch later: " + [...dsRow].map(([v, n]) => `${colourName(v)} ×${n}`).join(", "));
+        if (cut.length) notes.push("cut after this row: " + cut.map(strandLabel).join(", "));
+        copyRows.push([ro.row, ro.side, ro.rtl ? "right to left" : "left to right",
+          ro.items.map((it) => (it.floatBefore ? `(carry ${it.floatBefore}) ` : "") + `${strandLabel(it.strand)} x${it.n}`).join(", "),
+          ro.started.map(strandLabel).join(" "), cut.map(strandLabel).join(" ")]);
+        return `<div class="rowline"><span class="rn">Row ${ro.row}<small title="${ro.rtl ? "worked right to left" : "worked left to right"}">${ro.side} ${ro.rtl ? "←" : "→"}</small></span><div class="chips">${seq || '<span class="hint">no stitches</span>'}${notes.length ? `<span class="notes">${notes.join(" · ")}</span>` : ""}</div></div>`;
+      }).join("")}</div>
+      <p class="hint" style="padding:8px 14px 0">Runs are listed in the order you knit them. ↷ shows how many stitches the yarn is carried behind before that run.</p>`;
+    }
+    p.querySelectorAll("[data-ds-strand]").forEach((el) => el.addEventListener("click", (e) => { e.stopPropagation(); markStrand(+el.dataset.dsStrand); }));
+    p.querySelectorAll("[data-patch-fill]").forEach((el) => el.addEventListener("change", () => {
+      const pt = state.dsInfo.patches[+el.dataset.patchFill], v = el.value;
+      if (v === "mixed") return;
+      pt.cells.forEach((j) => (+v < 0 ? state.dsOver.delete(j) : state.dsOver.set(j, +v)));
+      dsChanged();
+    }));
+    p.querySelectorAll("[data-ds-patch]").forEach((el) => el.addEventListener("click", () => {
+      for (const i of state.dsInfo.patches[+el.dataset.dsPatch].cells) { state.ds.delete(i); state.dsOver.delete(i); }
+      dsChanged();
+    }));
+    p.querySelectorAll("[data-strand]").forEach((el) => {
+      const go = () => { const k = +el.dataset.strand; select(k === state.sel ? null : k); };
+      el.addEventListener("click", go);
+      if (el.tagName === "TR") el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+    });
+  }
+
+  $("copyBtn").addEventListener("click", async () => {
+    const text = copyRows.map((r) => r.join("\t")).join("\n");
+    try { await navigator.clipboard.writeText(text); $("copyBtn").textContent = "Copied"; }
+    catch {
+      const ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); $("copyBtn").textContent = "Copied"; } catch { $("copyBtn").textContent = "Couldn't copy"; }
+      ta.remove();
+    }
+    setTimeout(() => ($("copyBtn").textContent = "Copy table"), 1600);
+  });
+
+  if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", drawChart);
+  new MutationObserver(drawChart).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ------------------------------------------------------------ projects: save, open, download
+  const rle = (arr) => {
+    const out = [];
+    for (let i = 0; i < arr.length; ) { let j = i; while (j < arr.length && arr[j] === arr[i]) j++; out.push(j - i > 1 ? `${arr[i]}*${j - i}` : `${arr[i]}`); i = j; }
+    return out.join(",");
+  };
+  const unrle = (str, n) => {
+    const out = new Int16Array(n); let k = 0;
+    for (const part of String(str).split(",")) {
+      const [v, c] = part.split("*"); const cnt = c ? parseInt(c, 10) : 1, val = parseInt(v, 10);
+      for (let t = 0; t < cnt && k < n; t++) out[k++] = val;
+    }
+    if (k !== n) throw new Error("This project file is damaged (the chart is the wrong size).");
+    return out;
+  };
+  function projectData() {
+    const g = state.grid;
+    return {
+      app: "intarsia-strand-counter", version: 1,
+      name: $("projName").value.trim() || "Untitled chart",
+      rows: g.rows, cols: g.cols, cells: rle(Array.from(g.cells)),
+      palette: g.palette.map((p) => ({ hex: p.hex, none: !!p.none })),
+      names: g.palette.map((_, i) => colourName(i)),
+      firstRS: state.firstRS, carryMax: state.carryMax,
+      needle: state.needle, tailCm: state.tailCm, units: state.units, ownMm: state.ownMm,
+      ds: [...state.ds].sort((a, b) => a - b), dsFill: state.dsFill, dsOver: [...state.dsOver],
+    };
+  }
+  function restoreProject(p, id) {
+    if (!p || p.app !== "intarsia-strand-counter" || !(p.rows > 0) || !(p.cols > 0) || !Array.isArray(p.palette))
+      throw new Error("That file isn't a project saved from this app.");
+    const n = p.rows * p.cols;
+    const palette = p.palette.map((c) => ({ hex: c.hex, rgb: Core.hexToRgb(c.hex), none: !!c.none }));
+    const cells = unrle(p.cells, n);
+    for (let i = 0; i < n; i++) if (cells[i] >= palette.length) cells[i] = -1;
+    setPlaying(false);
+    state.image = null; $("imgPanel").hidden = true; showError("");
+    setGrid({ rows: p.rows, cols: p.cols, cells, palette }, Array.isArray(p.names) ? p.names.map(String) : null);
+    // settings
+    state.firstRS = p.firstRS !== false;
+    $("rsBtn").setAttribute("aria-pressed", state.firstRS); $("wsBtn").setAttribute("aria-pressed", !state.firstRS);
+    state.carryMax = Math.max(0, Math.min(50, p.carryMax | 0)); $("carry").value = state.carryMax;
+    if (Core.GAUGE[p.needle]) { state.needle = p.needle; $("needle").value = String(p.needle); }
+    if (p.tailCm >= 0) { state.tailCm = p.tailCm; $("tail").value = p.tailCm; }
+    state.units = p.units === "yd" ? "yd" : "m";
+    $("unitM").setAttribute("aria-pressed", state.units === "m"); $("unitYd").setAttribute("aria-pressed", state.units === "yd");
+    state.ownMm = p.ownMm > 0 ? p.ownMm : null; $("ownMm").value = state.ownMm || "";
+    state.ds = new Set((p.ds || []).filter((i) => i >= 0 && i < n));
+    state.dsFill = p.dsFill >= 0 && p.dsFill < palette.length ? p.dsFill : -1;
+    state.dsOver = new Map((p.dsOver || []).filter(([i, v]) => i >= 0 && i < n && v >= 0 && v < palette.length));
+    $("projName").value = p.name || "Untitled chart";
+    state.projId = id;
+    recompute();
+    renderSaved();
+  }
+
+  // saving in this browser: no account needed, charts stay on this device
+  const STORE_KEY = "intarsia-strand-counter.charts.v1";
+  let saved = [], storeOk = false;
+  const msg = (t) => { $("saveMsg").textContent = t; };
+  function readStore() {
+    try { const v = JSON.parse(localStorage.getItem(STORE_KEY) || "[]"); return Array.isArray(v) ? v : []; }
+    catch { return []; }
+  }
+  function writeStore(list) {
+    localStorage.setItem(STORE_KEY, JSON.stringify(list)); // throws when full or blocked
+    saved = list;
+  }
+  try { const t = "__isc_test"; localStorage.setItem(t, "1"); localStorage.removeItem(t); storeOk = true; } catch {}
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  function renderSaved() {
+    if (!storeOk) return;
+    saved.sort((x, y) => (y.savedAt || 0) - (x.savedAt || 0));
+    $("saveNewBtn").hidden = !state.projId || !saved.some((d) => d.id === state.projId);
+    $("savedWrap").hidden = !saved.length;
+    $("savedTitle").textContent = `Saved in this browser (${saved.length})`;
+    $("savedList").innerHTML = saved.map((d) => {
+      const when = d.savedAt ? new Date(d.savedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+      return `<li class="${d.id === state.projId ? "current" : ""}"><span class="nm">${esc(d.name || "Untitled chart")}</span>
+        <span class="meta">${esc(d.size || "")}${when ? " · " + when : ""}</span>
+        <span class="acts"><button type="button" data-open="${esc(d.id)}">Open</button><button type="button" class="danger" data-del="${esc(d.id)}">Delete</button></span></li>`;
+    }).join("");
+    $("savedList").querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => {
+      const d = saved.find((x) => x.id === b.dataset.open);
+      try { restoreProject(JSON.parse(d.project), d.id); $("fileName").textContent = "Opened: " + (d.name || "saved chart"); $("exampleBtn").hidden = false; msg(""); }
+      catch (e) { msg(e.message || "That saved chart couldn't be opened."); }
+    }));
+    $("savedList").querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", () => {
+      if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Delete?"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Delete"; } }, 4000); return; }
+      try {
+        writeStore(readStore().filter((d) => d.id !== b.dataset.del));
+        if (state.projId === b.dataset.del) state.projId = null;
+        msg("Deleted."); renderSaved();
+      } catch { msg("Couldn't delete that chart."); }
+    }));
+  }
+  function saveProject(asNew) {
+    const data = projectData();
+    const list = readStore();
+    const id = !asNew && state.projId && list.some((d) => d.id === state.projId) ? state.projId : newId();
+    const body = { id, name: data.name, savedAt: Date.now(), size: `${data.cols} × ${data.rows}, ${state.analysis.strands.length} strands`, project: JSON.stringify(data) };
+    try {
+      writeStore([body, ...list.filter((d) => d.id !== id)]);
+      state.projId = id;
+      msg(`Saved "${data.name}" in this browser.`);
+      renderSaved();
+    } catch {
+      msg("This browser's storage is full or switched off. Delete a saved chart, or download a project file instead.");
+    }
+  }
+  $("saveBtn").addEventListener("click", () => saveProject(false));
+  $("saveNewBtn").addEventListener("click", () => saveProject(true));
+  // keep the list in step if the app is open in another tab
+  window.addEventListener("storage", (e) => { if (e.key === STORE_KEY) { saved = readStore(); renderSaved(); } });
+  if (storeOk) { saved = readStore(); $("saveRow").hidden = false; $("saveNote").hidden = false; renderSaved(); }
+
+  // downloads: through the Claude viewer when the page is shown there, as a normal download anywhere else
+  let downloads = null;
+  const inViewer = !!(window.claude && window.claude.use);
+  async function offer(filename, data) {
+    if (downloads) {
+      try { await downloads.save({ filename, data }); msg(""); }
+      catch (e) {
+        if (e && e.code === "declined") return;
+        msg(e && e.code === "rate_limited" ? "A download is already waiting for you to confirm." : "That download didn't work here.");
+      }
+      return;
+    }
+    const blob = data instanceof Blob ? data : new Blob([data], { type: filename.endsWith(".csv") ? "text/csv" : "application/json" });
+    const url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  const safeName = () => ($("projName").value.trim() || "intarsia chart").replace(/[\\/:*?"<>|]+/g, "-").slice(0, 80);
+  $("dlProject").addEventListener("click", () => offer(safeName() + ".json", JSON.stringify(projectData(), null, 1)));
+  $("dlPng").addEventListener("click", () => cv.toBlob((blob) => blob && offer(safeName() + ".png", blob), "image/png"));
+  $("dlCsv").addEventListener("click", () => {
+    const tabName = { colours: "by colour", strands: "strands", blocks: "colour areas", rows: "row by row", ds: "duplicate stitch" }[state.tab];
+    if (!copyRows.length) { msg("This table is empty."); return; }
+    const cell = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    offer(`${safeName()} - ${tabName}.csv`, "﻿" + copyRows.map((r) => r.map(cell).join(",")).join("\r\n"));
+  });
+  function showDownloads(on) {
+    $("dlWrap").hidden = !on;
+    $("noSaveHint").hidden = on || storeOk;
+  }
+  if (!inViewer) showDownloads(true);
+  else (async () => {
+    downloads = await window.claude.use("downloads").catch(() => null);
+    showDownloads(!!downloads);
+  })();
+
+  const ex = exampleGrid();
+  setGrid(ex.grid, ex.names);
+})();
+</script>
+
+</body>
+</html>
